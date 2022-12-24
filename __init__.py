@@ -4,21 +4,21 @@
 ##
 ## https://hashdb.openanalysis.net/
 ##
-##   _   _           _    ____________ 
-##  | | | |         | |   |  _  \ ___ \ 
+##   _   _           _    ____________
+##  | | | |         | |   |  _  \ ___ \
 ##  | |_| | __ _ ___| |__ | | | | |_/ /
-##  |  _  |/ _` / __| '_ \| | | | ___ \ 
+##  |  _  |/ _` / __| '_ \| | | | ___ \
 ##  | | | | (_| \__ \ | | | |/ /| |_/ /
-##  \_| |_/\__,_|___/_| |_|___/ \____/ 
+##  \_| |_/\__,_|___/_| |_|___/ \____/
 ##
 ## HashDB is a community-sourced library of hashing algorithms used in malware.
 ## New hash algorithms can be added here: https://github.com/OALabs/hashdb
 ##
-## Rewritten for Binary Ninnja by @psifertex, original IDA plugin by @herrcore
+## Rewritten for Binary Ninja by @psifertex, original IDA plugin by @herrcore
 ##
 ## To install:
 ##      - Install via the plugin manager! Or...
-##      - Clone this repository (or download the bundle) into your plugin folder 
+##      - Clone this repository (or download the bundle) into your plugin folder
 ##        (Tools/Open Plugin Folder)
 ##
 ## To run:
@@ -29,10 +29,10 @@
 ##          Right-click on the constant again -> Enum -> Select new hash enum
 ##
 ## Credits: This Binary Ninja plugin was ported from the OALabs HashDB-IDA plugin
-##          https://github.com/OALabs/hashdb-ida and is released under the same BSD 
+##          https://github.com/OALabs/hashdb-ida and is released under the same BSD
 ##          3-Clause license.
 ##
-## Todo: 
+## Todo:
 ##          Create background threads for blocking tasks
 ##          Actually create enums, or investigate alternatives (vs just logging for now)
 ##          Test IAT creation method
@@ -80,9 +80,9 @@ Settings().register_setting("hashdb.enum_name", f"""
 
 # Using a global setting for the URL and enum_name so it can be changed
 # system-wide and replacing the global variable with the settings API so
-# they can be changed on the fly without having to reload the plugin ur 
+# they can be changed on the fly without having to reload the plugin ur
 # use a distinct settings system.
-# 
+#
 # The xor and alg setting will be serialized into each analysis
 # database's metadata.
 ENUM_NAME = Settings().get_string("hashdb.enum_name")
@@ -107,13 +107,13 @@ def set_xor_key(context):
             log_warn("HashDB: plugin does not currently handle negative values.")
             return
         xor_value = token.value
-        bv.store_metadata("HASHDB_XOR_VALUE", xor_value) 
+        bv.store_metadata("HASHDB_XOR_VALUE", xor_value)
         log_info(f"HashDB: XOR key set: {hex(xor_value)}")
         return True
     else:
         log_info(f"HashDB: failed to set XOR key.")
         return False
-    
+
 
 #--------------------------------------------------------------------------
 # Hash lookup
@@ -182,7 +182,7 @@ def hash_lookup(context):
         log_info(f"Hash match found: {string_value}")
         # TODO: Add hash to enum
         if hash_string.get('is_api',False):
-            # If the hash is an API ask if the user wants to 
+            # If the hash is an API ask if the user wants to
             # import all of the hashes from the module and permutation
             modules = hash_string.get('modules',[])
             modules.sort()
@@ -191,7 +191,7 @@ def hash_lookup(context):
                 module_name = modules[module_choice]
                 if module_name != None:
                     try:
-                        #TODO: Background thread 
+                        #TODO: Background thread
                         module_hash_list = api.get_module_hashes(module_name, HASHDB_ALGORITHM, hash_string.get('permutation',''))
                         # Parse hash and string from list into tuple list [(string,hash)]
                         hash_list = []
@@ -215,7 +215,7 @@ def hash_lookup(context):
     else:
         log_error("HashDB: Invalid hash selected.")
         return
-    return 
+    return
 
 
 def change_hash(context):
@@ -232,7 +232,7 @@ def get_hash(bv):
         HASHDB_ALGORITHM = bv.query_metadata("HASHDB_ALGORITHM")
     except:
         pass
-    
+
     if HASHDB_ALGORITHM is None:
         algorithms = api.get_algorithms()
         algorithms.sort()
@@ -277,9 +277,9 @@ def hash_scan(context):
             # Extract hash info from results
             hash_list = hash_results.get('hashes',[])
             if len(hash_list) == 0:
-                # No hash found 
-                # Increment the counter and continue 
-                continue 
+                # No hash found
+                # Increment the counter and continue
+                continue
             elif len(hash_list) == 1:
                 hash_string = hash_list[0].get('string',{})
             else:
@@ -403,7 +403,7 @@ def add_enums(bv: BinaryView, enum_name: str, hash_list: List[Tuple[str, int]]) 
                             enum_value_name, # new name
                             enum_value, # new value
                         )
-                        # TODO: It's possible here that the user would like to 
+                        # TODO: It's possible here that the user would like to
                         # always ignore any duplicate enum members,
                         # rather than always replacing them.
                         # Consider how to handle this in the future.
@@ -427,8 +427,8 @@ def plugin_parent_menu() -> str:
     return parent_menu
 
 for (action, target, add_to_menu) in [["HashDB\\Hash Lookup", hash_lookup, False],
-                         ["HashDB\\Set Xor...", set_xor_key, False], 
-                         ["HashDB\\Hunt", hunt_algorithm, False], 
+                         ["HashDB\\Set Xor...", set_xor_key, False],
+                         ["HashDB\\Hunt", hunt_algorithm, False],
                          ["HashDB\\IAT Scan", hash_scan, True],
                          ["HashDB\\Reset Hash", change_hash, True]]:
     UIAction.registerAction(action)
