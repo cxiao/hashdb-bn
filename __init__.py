@@ -40,16 +40,14 @@
 ##
 ########################################################################################
 
-import sys
+from . import hashdb_api as api
+
 from binaryninja import core_version, BinaryReader, BinaryView, Settings, interaction, enums
 from binaryninjaui import (UIAction, UIActionHandler, Menu, DockHandler, UIContext)
 from binaryninja.enums import TypeClass
 from binaryninja.log import (log_error, log_info, log_warn)
 from binaryninja.types import EnumerationBuilder, Type
 from typing import List, Optional, Tuple
-import requests
-import json
-
 
 #--------------------------------------------------------------------------
 # Global settings
@@ -89,61 +87,6 @@ if ENUM_NAME is None:
 HASHDB_XOR_VALUE = 0
 HASHDB_ALGORITHM = None
 HASHDB_HASH_SIZE = 4
-
-#--------------------------------------------------------------------------
-# Error class
-#--------------------------------------------------------------------------
-class HashDBError(Exception):
-    pass
-
-#--------------------------------------------------------------------------
-# HashDB API 
-#--------------------------------------------------------------------------
-
-def get_algorithms(api_url=Settings().get_string("hashdb.url")):
-    algorithms_url = api_url + '/hash'
-    r = requests.get(algorithms_url)
-    if not r.ok:
-        raise HashDBError(f"Get hash API request failed, status {r.status_code} for URL: {hash_url}")
-    results = r.json()
-    algorithms = [a.get('algorithm') for a in results.get('algorithms',[])]
-    return algorithms
-
-
-def get_strings_from_hash(algorithm, hash_value, xor_value=0, api_url=Settings().get_string("hashdb.url")):
-    hash_value ^= xor_value
-    hash_url = api_url + '/hash/%s/%d' % (algorithm, hash_value)
-    r = requests.get(hash_url)
-    if not r.ok:
-        raise HashDBError(f"Get hash API request failed, status {r.status_code} for URL: {hash_url}")
-    results = r.json()
-    return results
-
-
-def get_module_hashes(module_name, algorithm, permutation, api_url=Settings().get_string("hashdb.url")):
-    module_url = api_url + '/module/%s/%s/%s' % (module_name, algorithm, permutation)
-    r = requests.get(module_url)
-    if not r.ok:
-        raise HashDBError(f"Get hash API request failed, status {r.status_code} for URL: {hash_url}")
-    results = r.json()
-    return results
-
-
-def hunt_hash(hash_value, api_url=Settings().get_string("hashdb.url")):
-    matches = []
-    hash_list = [hash_value]
-    module_url = api_url + '/hunt'
-    r = requests.post(module_url, json={"hashes": hash_list})
-    if not r.ok:
-        log_info(module_url)
-        log_info(hash_list)
-        log_info(r.json())
-        raise HashDBError(f"Get hash API request failed, status {r.status_code} for URL: {hash_url}")
-    for hit in r.json().get('hits',[]):
-        algo = hit.get('algorithm',None)
-        if (algo != None) and (algo not in matches):
-            matches.append(algo)
-    return matches
 
 #--------------------------------------------------------------------------
 # Set xor key
@@ -198,7 +141,7 @@ def hash_lookup(context):
 
         # Lookup hash
         try:
-            hash_results = get_strings_from_hash(HASHDB_ALGORITHM, hash_value, xor_value=HASHDB_XOR_VALUE)
+            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value, xor_value=HASHDB_XOR_VALUE)
         except Exception as e:
             log_error(f"HashDB: API request failed: {e}")
             return
@@ -245,7 +188,7 @@ def hash_lookup(context):
                 if module_name != None:
                     try:
                         #TODO: Background thread 
-                        module_hash_list = get_module_hashes(module_name, HASHDB_ALGORITHM, hash_string.get('permutation',''))
+                        module_hash_list = api.get_module_hashes(module_name, HASHDB_ALGORITHM, hash_string.get('permutation',''))
                         # Parse hash and string from list into tuple list [(string,hash)]
                         hash_list = []
                         for function_entry in module_hash_list.get('hashes',[]):
@@ -287,7 +230,7 @@ def get_hash(bv):
         pass
     
     if HASHDB_ALGORITHM is None:
-        algorithms = get_algorithms()
+        algorithms = api.get_algorithms()
         algorithms.sort()
         algorithm_choice = interaction.get_choice_input("Select an algorithm:", "Algorithms", algorithms)
         if algorithm_choice is not None:
@@ -324,7 +267,7 @@ def hash_scan(context):
         br.seek(context.address)
         while br.offset < (context.address + context.length):
             hash_value = br.read32()
-            hash_results = get_strings_from_hash(HASHDB_ALGORITHM, hash_value, xor_value=HASHDB_XOR_VALUE)
+            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value, xor_value=HASHDB_XOR_VALUE)
 
             # Extract hash info from results
             hash_list = hash_results.get('hashes',[])
@@ -385,7 +328,7 @@ def hunt_algorithm(context):
         hash_value ^= HASHDB_XOR_VALUE
         try:
             #TODO: Convert to a background task for status indicator 
-            match_results = hunt_hash(hash_value, api_url=Settings().get_string("hashdb.url"))
+            match_results = api.hunt_hash(hash_value, api_url=Settings().get_string("hashdb.url"))
             match_results.sort()
         except Exception as e:
             log_error(f"HashDB HashDB API request failed: {e}")
