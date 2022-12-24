@@ -232,7 +232,7 @@ def hash_lookup(context):
             # import all of the hashes from the module and permutation
             modules = hash_string.get('modules',[])
             modules.sort()
-            module_choice = get_choice_input(f"The hash for {string_value} is a module function.\n\nDo you want to import all function hashes from this module?","HashDB Bulk Import", modules)
+            module_choice = interaction.get_choice_input(f"The hash for {string_value} is a module function.\n\nDo you want to import all function hashes from this module?","HashDB Bulk Import", modules)
             if module_choice is not None:
                 module_name = modules[module_choice]
             if module_name != None:
