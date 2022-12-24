@@ -40,14 +40,18 @@
 ##
 ########################################################################################
 
-from . import hashdb_api as api
+from typing import List, Optional, Tuple
 
 from binaryninja import core_version, BinaryReader, BinaryView, Settings, interaction, enums
 from binaryninjaui import (UIAction, UIActionHandler, Menu, DockHandler, UIContext)
 from binaryninja.enums import TypeClass
 from binaryninja.log import (log_error, log_info, log_warn)
 from binaryninja.types import EnumerationBuilder, Type
-from typing import List, Optional, Tuple
+from binaryninja.plugin import BackgroundTaskThread
+from binaryninja.mainthread import execute_on_main_thread
+
+from . import hashdb_api as api
+
 
 #--------------------------------------------------------------------------
 # Global settings
@@ -309,6 +313,36 @@ def hash_scan(context):
 #--------------------------------------------------------------------------
 # Algorithm search function
 #--------------------------------------------------------------------------
+class HuntAlgorithmTask(BackgroundTaskThread):
+    def __init__(self, context, hash_value):
+        super().__init__(initial_progress_text="[HashDB] Algorithm hunt task starting...", can_cancel=False)
+        self.context = context
+        self.match_results = None
+        self.hash_value = hash_value
+
+    def run(self):
+        self.task_fn(self.hash_value)
+        execute_on_main_thread(self.callback_fn)
+
+    def task_fn(self, hash_value):
+        try:
+            match_results = api.hunt_hash(hash_value, api_url=Settings().get_string("hashdb.url"))
+            match_results.sort()
+            self.match_results = match_results
+        except Exception as e:
+            log_error(f"HashDB HashDB API request failed: {e}")
+            return
+
+    def callback_fn(self):
+        if self.match_results is None or len(self.match_results) == 0:
+            interaction.show_message_box("No Match", "No algorithms matched the hash.")
+        else:
+            msg = """The following algorithms contain a matching hash.
+            Select an algorithm to set as the default for this binary."""
+            choice = interaction.get_choice_input(msg, "Select a hash", self.match_results)
+            self.context.binaryView.store_metadata("HASHDB_ALGORITHM", self.match_results[choice])
+
+
 def hunt_algorithm(context):
     bv = context.binaryView
     HASHDB_XOR_VALUE = 0
@@ -326,19 +360,7 @@ def hunt_algorithm(context):
             return
         hash_value = token.value
         hash_value ^= HASHDB_XOR_VALUE
-        try:
-            #TODO: Convert to a background task for status indicator 
-            match_results = api.hunt_hash(hash_value, api_url=Settings().get_string("hashdb.url"))
-            match_results.sort()
-        except Exception as e:
-            log_error(f"HashDB HashDB API request failed: {e}")
-            return
-        if len(match_results) == 0:
-            interaction.show_message_box("No Match", "No algorithms matched the hash.")
-        else:
-            msg = "The following algorithms contain a matching hash.\nSelect an algorithm to set as the default for this binary."
-            choice = interaction.get_choice_input(msg, "Select a hash", match_results)
-            bv.store_metadata("HASHDB_ALGORITHM", match_results[choice])
+        HuntAlgorithmTask(context=context, hash_value=hash_value).start()
     else:
         log_warn("HashDB: This token does not look like a valid integer.")
 
