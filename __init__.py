@@ -41,9 +41,12 @@
 ########################################################################################
 
 import sys
-from binaryninja import core_version, BinaryReader, Settings, interaction, enums
+from binaryninja import core_version, BinaryReader, BinaryView, Settings, interaction, enums
 from binaryninjaui import (UIAction, UIActionHandler, Menu, DockHandler, UIContext)
+from binaryninja.enums import TypeClass
 from binaryninja.log import (log_error, log_info, log_warn)
+from binaryninja.types import EnumerationBuilder, Type
+from typing import List, Optional, Tuple
 import requests
 import json
 
@@ -51,6 +54,7 @@ import json
 #--------------------------------------------------------------------------
 # Global settings
 #--------------------------------------------------------------------------
+DEFAULT_ENUM_NAME = "hashdb_strings"
 
 Settings().register_group("hashdb", "Open Analysis HashDB")
 Settings().register_setting("hashdb.url", """
@@ -62,14 +66,14 @@ Settings().register_setting("hashdb.url", """
         "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
     }
     """)
-Settings().register_setting("hashdb.enum_name", """
-    {
+Settings().register_setting("hashdb.enum_name", f"""
+    {{
         "title" : "Enum used for hashdb strings",
         "type" : "string",
-        "default" : "hashdb_strings",
+        "default" : {DEFAULT_ENUM_NAME},
         "description" : "Enum populated with hashdb results",
         "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
-    }
+    }}
     """)
 
 # Using a global setting for the URL and enum_name so it can be changed
@@ -79,7 +83,9 @@ Settings().register_setting("hashdb.enum_name", """
 # 
 # The xor and alg setting will be serialized into each analysis
 # database's metadata.
-ENUM_NAME = Settings().get_string("hashdb.enum_name") 
+ENUM_NAME = Settings().get_string("hashdb.enum_name")
+if ENUM_NAME is None:
+    ENUM_NAME = DEFAULT_ENUM_NAME
 HASHDB_XOR_VALUE = 0
 HASHDB_ALGORITHM = None
 HASHDB_HASH_SIZE = 4
@@ -241,13 +247,14 @@ def hash_lookup(context):
                         #TODO: Background thread 
                         module_hash_list = get_module_hashes(module_name, HASHDB_ALGORITHM, hash_string.get('permutation',''))
                         # Parse hash and string from list into tuple list [(string,hash)]
-                        enum_list = []
+                        hash_list = []
                         for function_entry in module_hash_list.get('hashes',[]):
                             # If xor is enabled we must convert the hashes
-                            enum_list.append((function_entry.get('string',{}).get('api',''),HASHDB_XOR_VALUE^function_entry.get('hash',0)))
+                            hash_list.append((function_entry.get('string',{}).get('api',''),HASHDB_XOR_VALUE^function_entry.get('hash',0)))
                         # Add hashes to enum
                         #TODO: Add hashes for the module
-                        log_info(enum_list)
+                        log_info(hash_list)
+                        add_enums(bv, ENUM_NAME, hash_list)
                         #enum_id = add_enums(ENUM_NAME, enum_list)
                         #if enum_id == None:
                             #idaapi.msg("ERROR: Unable to create or find enum: %s\n" % ENUM_NAME)
@@ -392,6 +399,56 @@ def hunt_algorithm(context):
     else:
         log_warn("HashDB: This token does not look like a valid integer.")
 
+
+#--------------------------------------------------------------------------
+# Enum creation
+#--------------------------------------------------------------------------
+def add_enums(bv: BinaryView, enum_name: str, hash_list: List[Tuple[str, int]]) -> None:
+    # TODO: Normalize enum names, and fix potentially invalid enum names
+    
+    existing_type = bv.types.get(enum_name)
+    if existing_type is None:
+        # Create a new enum
+        with EnumerationBuilder.builder(bv, enum_name) as new_enum:
+            for enum_value_name, enum_value in hash_list:
+                new_enum.append(enum_value_name, enum_value)
+    else:
+        # Modify an existing enum
+        if existing_type.type_class == TypeClass.EnumerationTypeClass:
+            with Type.builder(bv, enum_name) as existing_enum:
+                # In Binary Ninja, enumeration members are not guaranteed to be unique.
+                # It is possible to have 2 different enum members
+                # with exactly the same name and the same value.
+                # Therefore, we must take care to _replace_ any existing enum member
+                # with the same name as the enum member we would like to add,
+                # rather than _appending_ a duplicate member with the same name.
+
+                # Create a list of member names to use for lookup.
+                # EnumerationBuilder.replace requires a member index as an argument,
+                # so we must save the original member index as well.
+                member_dict = {
+                    member.name: idx for (idx, member) in enumerate(existing_enum.members)
+                }
+
+                for enum_value_name, enum_value in hash_list:
+                    if enum_value_name in member_dict:
+                        existing_enum.replace(
+                            member_dict.get(enum_value_name), # original member idx
+                            enum_value_name, # new name
+                            enum_value, # new value
+                        )
+                        # TODO: It's possible here that the user would like to 
+                        # always ignore any duplicate enum members,
+                        # rather than always replacing them.
+                        # Consider how to handle this in the future.
+                    else:
+                        # Enum member with this name doesn't yet exist
+                        existing_enum.append(
+                            enum_value_name, # new name
+                            enum_value, # new value
+                        )
+        else:
+            log_error(f"Enum values could not be added; a non-enum type with the name {enum_name} already exists.")
 
 #--------------------------------------------------------------------------
 # Plugin Registration
