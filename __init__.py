@@ -41,8 +41,9 @@
 ########################################################################################
 
 import sys
-from binaryninja import BinaryReader, Settings, log_error, log_info, log_warn, interaction, enums
+from binaryninja import BinaryReader, Settings, interaction, enums
 from binaryninjaui import (UIAction, UIActionHandler, Menu, DockHandler, UIContext)
+from binaryninja.log import (log_error, log_info, log_warn)
 import requests
 import json
 
@@ -128,9 +129,9 @@ def hunt_hash(hash_value, api_url=Settings().get_string("hashdb.url")):
     module_url = api_url + '/hunt'
     r = requests.post(module_url, json={"hashes": hash_list})
     if not r.ok:
-        print(module_url)
-        print(hash_list)
-        print(r.json())
+        log_info(module_url)
+        log_info(hash_list)
+        log_info(r.json())
         raise HashDBError(f"Get hash API request failed, status {r.status_code} for URL: {hash_url}")
     for hit in r.json().get('hits',[]):
         algo = hit.get('algorithm',None)
@@ -246,7 +247,7 @@ def hash_lookup(context):
                             enum_list.append((function_entry.get('string',{}).get('api',''),HASHDB_XOR_VALUE^function_entry.get('hash',0)))
                         # Add hashes to enum
                         #TODO: Add hashes for the module
-                        print(enum_list)
+                        log_info(enum_list)
                         #enum_id = add_enums(ENUM_NAME, enum_list)
                         #if enum_id == None:
                             #idaapi.msg("ERROR: Unable to create or find enum: %s\n" % ENUM_NAME)
@@ -301,7 +302,7 @@ def hash_scan(context):
     bv = context.binaryView
     HASHDB_XOR_VALUE = 0
     HASHDB_ALGORITHM = get_hash(bv)
-    print(f"outside: {HASHDB_ALGORITHM}")
+    log_info(f"outside: {HASHDB_ALGORITHM}")
     try:
         HASHDB_XOR_VALUE = bv.query_metadata("HASHDB_XOR_VALUE")
     except:
