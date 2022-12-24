@@ -19,9 +19,8 @@ def get_algorithms(api_url=Settings().get_string("hashdb.url")):
 
 
 def get_strings_from_hash(
-    algorithm, hash_value, xor_value=0, api_url=Settings().get_string("hashdb.url")
+    algorithm, hash_value, api_url=Settings().get_string("hashdb.url")
 ):
-    hash_value ^= xor_value
     hash_url = api_url + "/hash/%s/%d" % (algorithm, hash_value)
     r = requests.get(hash_url)
     if not r.ok:

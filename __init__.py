@@ -145,7 +145,7 @@ def hash_lookup(context):
 
         # Lookup hash
         try:
-            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value, xor_value=HASHDB_XOR_VALUE)
+            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value)
         except Exception as e:
             log_error(f"HashDB: API request failed: {e}")
             return
@@ -271,7 +271,8 @@ def hash_scan(context):
         br.seek(context.address)
         while br.offset < (context.address + context.length):
             hash_value = br.read32()
-            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value, xor_value=HASHDB_XOR_VALUE)
+            hash_value ^= HASHDB_XOR_VALUE
+            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value)
 
             # Extract hash info from results
             hash_list = hash_results.get('hashes',[])
