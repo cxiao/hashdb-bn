@@ -45,7 +45,7 @@ from typing import List, Optional, Tuple
 from binaryninja import core_version, BinaryReader, BinaryView, Settings, interaction, enums
 from binaryninjaui import (UIAction, UIActionHandler, Menu, DockHandler, UIContext)
 from binaryninja.enums import TypeClass
-from binaryninja.log import (log_error, log_info, log_warn)
+from binaryninja.log import Logger
 from binaryninja.types import EnumerationBuilder, Type
 from binaryninja.plugin import BackgroundTaskThread
 from binaryninja.mainthread import execute_on_main_thread
@@ -56,6 +56,8 @@ from . import hashdb_api as api
 #--------------------------------------------------------------------------
 # Global settings
 #--------------------------------------------------------------------------
+logger = Logger(session_id=0, logger_name=__name__)
+
 DEFAULT_ENUM_NAME = "hashdb_strings"
 
 Settings().register_group("hashdb", "Open Analysis HashDB")
@@ -104,14 +106,14 @@ def set_xor_key(context):
     if token and token.type == enums.InstructionTextTokenType.IntegerToken:
         if token.text.startswith('-'):
             #Handle negatives later
-            log_warn("HashDB: plugin does not currently handle negative values.")
+            logger.log_warn("plugin does not currently handle negative values.")
             return
         xor_value = token.value
         bv.store_metadata("HASHDB_XOR_VALUE", xor_value)
-        log_info(f"HashDB: XOR key set: {hex(xor_value)}")
+        logger.log_info(f"XOR key set: {hex(xor_value)}")
         return True
     else:
-        log_info(f"HashDB: failed to set XOR key.")
+        logger.log_info(f"failed to set XOR key.")
         return False
 
 
@@ -132,13 +134,13 @@ def hash_lookup(context):
         pass
 
     if HASHDB_ALGORITHM is None:
-        log_error('HashDB: No hash selected.')
+        logger.log_error('No hash selected.')
         return
 
     if token and token.type == enums.InstructionTextTokenType.IntegerToken:
         if token.text.startswith('-'):
             #Handle negatives later
-            log_warn("HashDB: plugin does not currently handle negative values.")
+            logger.log_warn("plugin does not currently handle negative values.")
             return
         hash_value = token.value
         hash_value ^= HASHDB_XOR_VALUE
@@ -147,11 +149,11 @@ def hash_lookup(context):
         try:
             hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value, api_url=Settings().get_string("hashdb.url"))
         except Exception as e:
-            log_error(f"HashDB: API request failed: {e}")
+            logger.log_error(f"API request failed: {e}")
             return
         hash_list = hash_results.get('hashes',[])
         if len(hash_list) == 0:
-            log_warn(f"HashDB: No Hash found for {hex(hash_value)}")
+            logger.log_warn(f"No Hash found for {hex(hash_value)}")
             return
         elif len(hash_list) == 1:
             hash_string = hash_list[0].get('string',{})
@@ -179,8 +181,7 @@ def hash_lookup(context):
         else:
             string_value = hash_string.get('string','')
 
-        log_info(f"Hash match found: {string_value}")
-        # TODO: Add hash to enum
+        logger.log_info(f"Hash match found: {string_value}")
         if hash_string.get('is_api',False):
             # If the hash is an API ask if the user wants to
             # import all of the hashes from the module and permutation
@@ -200,7 +201,7 @@ def hash_lookup(context):
                             hash_list.append((function_entry.get('string',{}).get('api',''),HASHDB_XOR_VALUE^function_entry.get('hash',0)))
                         # Add hashes to enum
                         #TODO: Add hashes for the module
-                        log_info(hash_list)
+                        logger.log_info(hash_list)
                         add_enums(bv, ENUM_NAME, hash_list)
                         #enum_id = add_enums(ENUM_NAME, enum_list)
                         #if enum_id == None:
@@ -208,12 +209,12 @@ def hash_lookup(context):
                         #else:
                             #idaapi.msg("Added %d hashes for module %s\n" % (len(enum_list),module_name))
                     except Exception as e:
-                        log_error(f"HashDB: ERROR {e}")
+                        logger.log_error(f"ERROR {e}")
                         return
                 else:
-                    log_error("HashDB: Invalid module name specified.")
+                    logger.log_error("Invalid module name specified.")
     else:
-        log_error("HashDB: Invalid hash selected.")
+        logger.log_error("Invalid hash selected.")
         return
     return
 
@@ -256,7 +257,7 @@ def hash_scan(context):
     bv = context.binaryView
     HASHDB_XOR_VALUE = 0
     HASHDB_ALGORITHM = get_hash(bv)
-    log_info(f"outside: {HASHDB_ALGORITHM}")
+    logger.log_info(f"outside: {HASHDB_ALGORITHM}")
     try:
         HASHDB_XOR_VALUE = bv.query_metadata("HASHDB_XOR_VALUE")
     except:
@@ -264,7 +265,7 @@ def hash_scan(context):
 
     # If there is no algorithm give the user a chance to choose one
     if HASHDB_ALGORITHM == None:
-        log_error("HashDB: You must select a hash to continue.")
+        logger.log_error("You must select a hash to continue.")
         return
     try:
         br = BinaryReader(bv, bv.endianness)
@@ -302,11 +303,11 @@ def hash_scan(context):
                 string_value = hash_string.get('api','')
             else:
                 string_value = hash_string.get('string','')
-            log_info(f"HashDB: Hash match found: {string_value}")
+            logger.log_info(f"Hash match found: {string_value}")
             # Add hash to enum
             # TODO
     except Exception as e:
-        log_error(f"HashDB: ERROR: {e}")
+        logger.log_error(f"ERROR: {e}")
         return
     return
 
@@ -331,7 +332,7 @@ class HuntAlgorithmTask(BackgroundTaskThread):
             match_results.sort()
             self.match_results = match_results
         except Exception as e:
-            log_error(f"HashDB HashDB API request failed: {e}")
+            logger.log_error(f"HashDB API request failed: {e}")
             return
 
     def callback_fn(self):
@@ -357,13 +358,13 @@ def hunt_algorithm(context):
     if token and token.type == enums.InstructionTextTokenType.IntegerToken:
         if token.text.startswith('-'):
             #Handle negatives later
-            log_warn("HashDB: plugin does not currently handle negative values.")
+            logger.log_warn("plugin does not currently handle negative values.")
             return
         hash_value = token.value
         hash_value ^= HASHDB_XOR_VALUE
         HuntAlgorithmTask(context=context, hash_value=hash_value).start()
     else:
-        log_warn("HashDB: This token does not look like a valid integer.")
+        logger.log_warn("This token does not look like a valid integer.")
 
 
 #--------------------------------------------------------------------------
@@ -371,7 +372,7 @@ def hunt_algorithm(context):
 #--------------------------------------------------------------------------
 def add_enums(bv: BinaryView, enum_name: str, hash_list: List[Tuple[str, int]]) -> None:
     # TODO: Normalize enum names, and fix potentially invalid enum names
-    
+
     existing_type = bv.types.get(enum_name)
     if existing_type is None:
         # Create a new enum
@@ -414,7 +415,7 @@ def add_enums(bv: BinaryView, enum_name: str, hash_list: List[Tuple[str, int]]) 
                             enum_value, # new value
                         )
         else:
-            log_error(f"Enum values could not be added; a non-enum type with the name {enum_name} already exists.")
+            logger.log_error(f"Enum values could not be added; a non-enum type with the name {enum_name} already exists.")
 
 #--------------------------------------------------------------------------
 # Plugin Registration
