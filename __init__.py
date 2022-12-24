@@ -41,7 +41,7 @@
 ########################################################################################
 
 import sys
-from binaryninja import BinaryReader, Settings, interaction, enums
+from binaryninja import core_version, BinaryReader, Settings, interaction, enums
 from binaryninjaui import (UIAction, UIActionHandler, Menu, DockHandler, UIContext)
 from binaryninja.log import (log_error, log_info, log_warn)
 import requests
@@ -396,12 +396,19 @@ def hunt_algorithm(context):
 #--------------------------------------------------------------------------
 # Plugin Registration
 #--------------------------------------------------------------------------
-for (action, target, menu) in [["HashDB\\Hash Lookup", hash_lookup, False],
+def plugin_parent_menu() -> str:
+    parent_menu = "Tools"
+    version = core_version()
+    if version and int(version[4:][:4]) >= 3505:
+        parent_menu = "Plugins"
+    return parent_menu
+
+for (action, target, add_to_menu) in [["HashDB\\Hash Lookup", hash_lookup, False],
                          ["HashDB\\Set Xor...", set_xor_key, False], 
                          ["HashDB\\Hunt", hunt_algorithm, False], 
                          ["HashDB\\IAT Scan", hash_scan, True],
                          ["HashDB\\Reset Hash", change_hash, True]]:
     UIAction.registerAction(action)
     UIActionHandler.globalActions().bindAction(action, UIAction(target))
-    if menu:
-        Menu.mainMenu("Tools").addAction(action, "HashDB")
+    if add_to_menu:
+        Menu.mainMenu(plugin_parent_menu()).addAction(action, "HashDB")
