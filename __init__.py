@@ -235,26 +235,28 @@ def hash_lookup(context):
             module_choice = interaction.get_choice_input(f"The hash for {string_value} is a module function.\n\nDo you want to import all function hashes from this module?","HashDB Bulk Import", modules)
             if module_choice is not None:
                 module_name = modules[module_choice]
-            if module_name != None:
-                try:
-                    #TODO: Background thread 
-                    module_hash_list = get_module_hashes(module_name, HASHDB_ALGORITHM, hash_string.get('permutation',''))
-                    # Parse hash and string from list into tuple list [(string,hash)]
-                    enum_list = []
-                    for function_entry in module_hash_list.get('hashes',[]):
-                        # If xor is enabled we must convert the hashes
-                        enum_list.append((function_entry.get('string',{}).get('api',''),HASHDB_XOR_VALUE^function_entry.get('hash',0)))
-                    # Add hashes to enum
-                    #TODO: Add hashes for the module
-                    print(enum_list)
-                    #enum_id = add_enums(ENUM_NAME, enum_list)
-                    #if enum_id == None:
-                        #idaapi.msg("ERROR: Unable to create or find enum: %s\n" % ENUM_NAME)
-                    #else:
-                        #idaapi.msg("Added %d hashes for module %s\n" % (len(enum_list),module_name))
-                except Exception as e:
-                    log_error(f"HashDB: ERROR {e}")
-                    return
+                if module_name != None:
+                    try:
+                        #TODO: Background thread 
+                        module_hash_list = get_module_hashes(module_name, HASHDB_ALGORITHM, hash_string.get('permutation',''))
+                        # Parse hash and string from list into tuple list [(string,hash)]
+                        enum_list = []
+                        for function_entry in module_hash_list.get('hashes',[]):
+                            # If xor is enabled we must convert the hashes
+                            enum_list.append((function_entry.get('string',{}).get('api',''),HASHDB_XOR_VALUE^function_entry.get('hash',0)))
+                        # Add hashes to enum
+                        #TODO: Add hashes for the module
+                        print(enum_list)
+                        #enum_id = add_enums(ENUM_NAME, enum_list)
+                        #if enum_id == None:
+                            #idaapi.msg("ERROR: Unable to create or find enum: %s\n" % ENUM_NAME)
+                        #else:
+                            #idaapi.msg("Added %d hashes for module %s\n" % (len(enum_list),module_name))
+                    except Exception as e:
+                        log_error(f"HashDB: ERROR {e}")
+                        return
+                else:
+                    log_error("HashDB: Invalid module name specified.")
     else:
         log_error("HashDB: Invalid hash selected.")
         return
