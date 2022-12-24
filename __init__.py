@@ -145,7 +145,7 @@ def hash_lookup(context):
 
         # Lookup hash
         try:
-            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value)
+            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value, api_url=Settings().get_string("hashdb.url"))
         except Exception as e:
             log_error(f"HashDB: API request failed: {e}")
             return
@@ -192,7 +192,7 @@ def hash_lookup(context):
                 if module_name != None:
                     try:
                         #TODO: Background thread
-                        module_hash_list = api.get_module_hashes(module_name, HASHDB_ALGORITHM, hash_string.get('permutation',''))
+                        module_hash_list = api.get_module_hashes(module_name, HASHDB_ALGORITHM, hash_string.get('permutation',''), api_url=Settings().get_string("hashdb.url"))
                         # Parse hash and string from list into tuple list [(string,hash)]
                         hash_list = []
                         for function_entry in module_hash_list.get('hashes',[]):
@@ -234,7 +234,7 @@ def get_hash(bv):
         pass
 
     if HASHDB_ALGORITHM is None:
-        algorithms = api.get_algorithms()
+        algorithms = api.get_algorithms(api_url=Settings().get_string("hashdb.url"))
         algorithms.sort()
         algorithm_choice = interaction.get_choice_input("Select an algorithm:", "Algorithms", algorithms)
         if algorithm_choice is not None:
@@ -272,7 +272,7 @@ def hash_scan(context):
         while br.offset < (context.address + context.length):
             hash_value = br.read32()
             hash_value ^= HASHDB_XOR_VALUE
-            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value)
+            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value, api_url=Settings().get_string("hashdb.url"))
 
             # Extract hash info from results
             hash_list = hash_results.get('hashes',[])

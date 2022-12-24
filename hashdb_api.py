@@ -1,12 +1,11 @@
 import requests
-from binaryninja import Settings
 
 
 class HashDBError(Exception):
     pass
 
 
-def get_algorithms(api_url=Settings().get_string("hashdb.url")):
+def get_algorithms(api_url):
     algorithms_url = api_url + "/hash"
     r = requests.get(algorithms_url)
     if not r.ok:
@@ -18,9 +17,7 @@ def get_algorithms(api_url=Settings().get_string("hashdb.url")):
     return algorithms
 
 
-def get_strings_from_hash(
-    algorithm, hash_value, api_url=Settings().get_string("hashdb.url")
-):
+def get_strings_from_hash(algorithm, hash_value, api_url):
     hash_url = api_url + "/hash/%s/%d" % (algorithm, hash_value)
     r = requests.get(hash_url)
     if not r.ok:
@@ -31,9 +28,7 @@ def get_strings_from_hash(
     return results
 
 
-def get_module_hashes(
-    module_name, algorithm, permutation, api_url=Settings().get_string("hashdb.url")
-):
+def get_module_hashes(module_name, algorithm, permutation, api_url):
     module_url = api_url + "/module/%s/%s/%s" % (module_name, algorithm, permutation)
     r = requests.get(module_url)
     if not r.ok:
@@ -44,7 +39,7 @@ def get_module_hashes(
     return results
 
 
-def hunt_hash(hash_value, api_url=Settings().get_string("hashdb.url")):
+def hunt_hash(hash_value, api_url):
     matches = []
     hash_list = [hash_value]
     module_url = api_url + "/hunt"
