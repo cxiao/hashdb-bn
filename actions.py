@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import cast, List, Optional, Tuple
 
 from binaryninja import BinaryReader, BinaryView, interaction
 from binaryninja.enums import InstructionTextTokenType, TypeClass
@@ -6,7 +6,8 @@ from binaryninja.log import Logger
 from binaryninja.mainthread import execute_on_main_thread
 from binaryninja.plugin import BackgroundTaskThread
 from binaryninja.settings import Settings, SettingsScope
-from binaryninja.types import EnumerationBuilder, Type
+from binaryninja.types import EnumerationBuilder, Type, QualifiedName
+from binaryninjaui import UIActionContext  # type: ignore
 
 from . import hashdb_api as api
 
@@ -15,7 +16,7 @@ logger = Logger(session_id=0, logger_name=__name__)
 # --------------------------------------------------------------------------
 # Set xor key
 # --------------------------------------------------------------------------
-def set_xor_key(context):
+def set_xor_key(context: UIActionContext) -> bool:
     """
     Set xor key from selection
     """
@@ -25,7 +26,7 @@ def set_xor_key(context):
         if token.text.startswith("-"):
             # Handle negatives later
             logger.log_warn("plugin does not currently handle negative values.")
-            return
+            return False
         xor_value = token.value
         Settings().set_integer(
             "hashdb.xor_value", xor_value, SettingsScope.SettingsResourceScope
@@ -40,20 +41,31 @@ def set_xor_key(context):
 # --------------------------------------------------------------------------
 # Hash lookup
 # --------------------------------------------------------------------------
-def hash_lookup(context):
+def hash_lookup(context: UIActionContext) -> None:
     """
     Lookup hash from highlighted text
     """
     bv = context.binaryView
     token = context.token.token
+
+    hashdb_api_url = Settings().get_string("hashdb.url")
+    if hashdb_api_url is None:
+        logger.log_error("HashDB API URL not found.")
+        return
+
+    hashdb_enum_name = Settings().get_string_with_scope("hashdb.enum_name", bv)[0]
+    if hashdb_enum_name is None:
+        logger.log_error("HashDB enum name not found.")
+        return
+
+    hashdb_algorithm = get_hash(bv)
+    if hashdb_algorithm is None:
+        logger.log_error("No hash algorithm selected.")
+        return
+
     hashdb_xor_value = Settings().get_integer_with_scope(
         "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
     )[0]
-    hashdb_algorithm = get_hash(bv)
-
-    if hashdb_algorithm is None:
-        logger.log_error("No hash selected.")
-        return
 
     if token and token.type == InstructionTextTokenType.IntegerToken:
         if token.text.startswith("-"):
@@ -68,7 +80,7 @@ def hash_lookup(context):
             hash_results = api.get_strings_from_hash(
                 hashdb_algorithm,
                 hash_value,
-                api_url=Settings().get_string("hashdb.url"),
+                hashdb_api_url,
             )
         except Exception as e:
             logger.log_error(f"API request failed: {e}")
@@ -125,7 +137,7 @@ def hash_lookup(context):
                             module_name,
                             hashdb_algorithm,
                             hash_string.get("permutation", ""),
-                            api_url=Settings().get_string("hashdb.url"),
+                            hashdb_api_url,
                         )
                         # Parse hash and string from list into tuple list [(string,hash)]
                         hash_list = []
@@ -139,11 +151,8 @@ def hash_lookup(context):
                             )
                         # Add hashes to enum
                         # TODO: Add hashes for the module
-                        logger.log_info(hash_list)
-                        enum_name = Settings().get_string_with_scope(
-                            "hashdb.enum_name", bv
-                        )[0]
-                        add_enums(bv, enum_name, hash_list)
+                        logger.log_info(f"hash_lookup obtained hash list: {hash_list}")
+                        add_enums(bv, hashdb_enum_name, hash_list)
                         # enum_id = add_enums(ENUM_NAME, enum_list)
                         # if enum_id == None:
                         # idaapi.msg("ERROR: Unable to create or find enum: %s\n" % ENUM_NAME)
@@ -160,7 +169,7 @@ def hash_lookup(context):
     return
 
 
-def change_hash(context):
+def change_hash(context) -> None:
     context.binaryView.remove_metadata("HASHDB_ALGORITHM")
     get_hash(context.binaryView)
 
@@ -168,13 +177,18 @@ def change_hash(context):
 # --------------------------------------------------------------------------
 # Ask for a hash
 # --------------------------------------------------------------------------
-def get_hash(bv):
+def get_hash(bv: BinaryView) -> Optional[str]:
+    hashdb_api_url = Settings().get_string("hashdb.url")
+    if hashdb_api_url is None:
+        logger.log_error("HashDB API URL not found.")
+        return
+
     hashdb_algorithm = Settings().get_string_with_scope(
         "hashdb.algorithm", bv, SettingsScope.SettingsResourceScope
     )[0]
 
     if hashdb_algorithm is None:
-        algorithms = api.get_algorithms(api_url=Settings().get_string("hashdb.url"))
+        algorithms = api.get_algorithms(hashdb_api_url)
         algorithms.sort()
         algorithm_choice = interaction.get_choice_input(
             "Select an algorithm:", "Algorithms", algorithms
@@ -194,32 +208,44 @@ def get_hash(bv):
 # --------------------------------------------------------------------------
 # Dynamic IAT hash scan
 # --------------------------------------------------------------------------
-def hash_scan(context):
+def hash_scan(context: UIActionContext) -> None:
     """
     Lookup hash from highlighted text
     """
     bv = context.binaryView
 
+    hashdb_api_url = Settings().get_string("hashdb.url")
+    if hashdb_api_url is None:
+        logger.log_error("HashDB API URL not found.")
+        return
+
+    hashdb_enum_name = Settings().get_string_with_scope("hashdb.enum_name", bv)[0]
+    if hashdb_enum_name is None:
+        logger.log_error("HashDB enum name not found.")
+        return
+
+    hashdb_algorithm = get_hash(bv)
+    if hashdb_algorithm is None:
+        logger.log_error("No hash algorithm selected.")
+        return
+
     hashdb_xor_value = Settings().get_integer_with_scope(
         "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
     )[0]
-    hashdb_algorithm = get_hash(bv)
-    logger.log_info(f"outside: {hashdb_algorithm}")
 
-    # If there is no algorithm give the user a chance to choose one
-    if hashdb_algorithm == None:
-        logger.log_error("You must select a hash to continue.")
-        return
     try:
         br = BinaryReader(bv, bv.endianness)
         br.seek(context.address)
         while br.offset < (context.address + context.length):
             hash_value = br.read32()
-            hash_value ^= hashdb_xor_value
+            if hash_value is not None:
+                hash_value ^= hashdb_xor_value
+            else:
+                logger.log_error("Highlighted text is not a valid integer.")
+                return
+
             hash_results = api.get_strings_from_hash(
-                hashdb_algorithm,
-                hash_value,
-                api_url=Settings().get_string("hashdb.url"),
+                hashdb_algorithm, hash_value, hashdb_api_url
             )
 
             # Extract hash info from results
@@ -233,7 +259,7 @@ def hash_scan(context):
             else:
                 collisions = {}
                 for string_match in hash_list:
-                    string_value = string.match.get("string", "")
+                    string_value = string_match.get("string", "")
                     if string_value.get("is_api", False):
                         collisions[string_value.get("api", "")] = string_value
                     else:
@@ -242,10 +268,10 @@ def hash_scan(context):
                     "Select the best hash: ", "Hash Selection", collisions.keys()
                 )
                 if hash_choice is not None:
-                    hash_string = collisions.keys()[hash_choice]
+                    hash_string = list(collisions.keys())[hash_choice]
                 else:
                     # User cancelled, select the first one?
-                    hash_string = collisions.keys()[0]
+                    hash_string = list(collisions.keys())[0]
 
             # Parse string from hash_string match
             if hash_string.get("is_api", False):
@@ -265,23 +291,25 @@ def hash_scan(context):
 # Algorithm search function
 # --------------------------------------------------------------------------
 class HuntAlgorithmTask(BackgroundTaskThread):
-    def __init__(self, context, hash_value):
+    def __init__(self, context: UIActionContext, hashdb_api_url: str, hash_value: int):
         super().__init__(
             initial_progress_text="[HashDB] Algorithm hunt task starting...",
             can_cancel=False,
         )
         self.context = context
-        self.match_results = None
+        self.hashdb_api_url = hashdb_api_url
         self.hash_value = hash_value
+        self.match_results = None
 
     def run(self):
-        self.task_fn(self.hash_value)
+        self.task_fn(self.hashdb_api_url, self.hash_value)
         execute_on_main_thread(self.callback_fn)
 
-    def task_fn(self, hash_value):
+    def task_fn(self, hashdb_api_url: str, hash_value: int) -> None:
         try:
             match_results = api.hunt_hash(
-                hash_value, api_url=Settings().get_string("hashdb.url")
+                hash_value,
+                hashdb_api_url,
             )
             match_results.sort()
             self.match_results = match_results
@@ -289,7 +317,7 @@ class HuntAlgorithmTask(BackgroundTaskThread):
             logger.log_error(f"HashDB API request failed: {e}")
             return
 
-    def callback_fn(self):
+    def callback_fn(self) -> None:
         if self.match_results is None or len(self.match_results) == 0:
             interaction.show_message_box("No Match", "No algorithms matched the hash.")
         else:
@@ -298,16 +326,35 @@ class HuntAlgorithmTask(BackgroundTaskThread):
             choice = interaction.get_choice_input(
                 msg, "Select a hash", self.match_results
             )
-            Settings().set_string(
-                "hashdb.algorithm",
-                self.match_results[choice],
-                self.context.binaryView,
-                SettingsScope.SettingsResourceScope,
-            )
+            if choice is not None:
+                Settings().set_string(
+                    "hashdb.algorithm",
+                    self.match_results[choice],
+                    self.context.binaryView,
+                    SettingsScope.SettingsResourceScope,
+                )
+            else:
+                logger.log_error("No hash algorithm selected.")
 
 
-def hunt_algorithm(context):
+def hunt_algorithm(context: UIActionContext) -> None:
     bv = context.binaryView
+
+    hashdb_api_url = Settings().get_string("hashdb.url")
+    if hashdb_api_url is None:
+        logger.log_error("HashDB API URL not found.")
+        return
+
+    hashdb_enum_name = Settings().get_string_with_scope("hashdb.enum_name", bv)[0]
+    if hashdb_enum_name is None:
+        logger.log_error("HashDB enum name not found.")
+        return
+
+    hashdb_algorithm = get_hash(bv)
+    if hashdb_algorithm is None:
+        logger.log_error("No hash algorithm selected.")
+        return
+
     hashdb_xor_value = Settings().get_integer_with_scope(
         "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
     )[0]
@@ -321,7 +368,7 @@ def hunt_algorithm(context):
             return
         hash_value = token.value
         hash_value ^= hashdb_xor_value
-        HuntAlgorithmTask(context=context, hash_value=hash_value).start()
+        HuntAlgorithmTask(context, hashdb_api_url, hash_value).start()
     else:
         logger.log_warn("This token does not look like a valid integer.")
 
@@ -335,13 +382,15 @@ def add_enums(bv: BinaryView, enum_name: str, hash_list: List[Tuple[str, int]]) 
     existing_type = bv.types.get(enum_name)
     if existing_type is None:
         # Create a new enum
-        with EnumerationBuilder.builder(bv, enum_name) as new_enum:
+        with EnumerationBuilder.builder(bv, QualifiedName(enum_name)) as new_enum:
+            new_enum = cast(EnumerationBuilder, new_enum)  # typing
             for enum_value_name, enum_value in hash_list:
                 new_enum.append(enum_value_name, enum_value)
     else:
         # Modify an existing enum
         if existing_type.type_class == TypeClass.EnumerationTypeClass:
-            with Type.builder(bv, enum_name) as existing_enum:
+            with Type.builder(bv, QualifiedName(enum_name)) as existing_enum:
+                existing_enum = cast(EnumerationBuilder, existing_enum)  # typing
                 # In Binary Ninja, enumeration members are not guaranteed to be unique.
                 # It is possible to have 2 different enum members
                 # with exactly the same name and the same value.
@@ -358,9 +407,10 @@ def add_enums(bv: BinaryView, enum_name: str, hash_list: List[Tuple[str, int]]) 
                 }
 
                 for enum_value_name, enum_value in hash_list:
-                    if enum_value_name in member_dict:
+                    enum_member_idx = member_dict.get(enum_value_name)
+                    if enum_member_idx is not None:
                         existing_enum.replace(
-                            member_dict.get(enum_value_name),  # original member idx
+                            enum_member_idx,  # original member idx
                             enum_value_name,  # new name
                             enum_value,  # new value
                         )

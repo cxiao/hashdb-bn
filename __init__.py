@@ -46,7 +46,7 @@ from typing import List, Tuple
 from binaryninja import core_version
 from binaryninja.log import Logger
 from binaryninja.settings import Settings
-from binaryninjaui import Menu, UIAction, UIActionHandler
+from binaryninjaui import Menu, UIAction, UIActionHandler # type: ignore
 
 from . import actions
 
