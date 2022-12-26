@@ -40,12 +40,14 @@
 ##
 ########################################################################################
 
+import json
 from typing import List, Optional, Tuple
 
-from binaryninja import core_version, BinaryReader, BinaryView, Settings, interaction, enums
+from binaryninja import core_version, BinaryReader, BinaryView, interaction, enums
 from binaryninjaui import (UIAction, UIActionHandler, Menu, DockHandler, UIContext)
 from binaryninja.enums import TypeClass
 from binaryninja.log import Logger
+from binaryninja.settings import Settings, SettingsScope
 from binaryninja.types import EnumerationBuilder, Type
 from binaryninja.plugin import BackgroundTaskThread
 from binaryninja.mainthread import execute_on_main_thread
@@ -53,32 +55,11 @@ from binaryninja.mainthread import execute_on_main_thread
 from . import hashdb_api as api
 
 
+logger = Logger(session_id=0, logger_name=__name__)
+
 #--------------------------------------------------------------------------
 # Global settings
 #--------------------------------------------------------------------------
-logger = Logger(session_id=0, logger_name=__name__)
-
-DEFAULT_ENUM_NAME = "hashdb_strings"
-
-Settings().register_group("hashdb", "Open Analysis HashDB")
-Settings().register_setting("hashdb.url", """
-    {
-        "title" : "HashDB API URL",
-        "type" : "string",
-        "default" : "https://hashdb.openanalysis.net",
-        "description" : "URL of the server used to query HashDB",
-        "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
-    }
-    """)
-Settings().register_setting("hashdb.enum_name", f"""
-    {{
-        "title" : "Enum used for hashdb strings",
-        "type" : "string",
-        "default" : {DEFAULT_ENUM_NAME},
-        "description" : "Enum populated with hashdb results",
-        "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
-    }}
-    """)
 
 # Using a global setting for the URL and enum_name so it can be changed
 # system-wide and replacing the global variable with the settings API so
@@ -86,13 +67,62 @@ Settings().register_setting("hashdb.enum_name", f"""
 # use a distinct settings system.
 #
 # The xor and alg setting will be serialized into each analysis
-# database's metadata.
-ENUM_NAME = Settings().get_string("hashdb.enum_name")
-if ENUM_NAME is None:
-    ENUM_NAME = DEFAULT_ENUM_NAME
-HASHDB_XOR_VALUE = 0
-HASHDB_ALGORITHM = None
-HASHDB_HASH_SIZE = 4
+# database's metadata, by always using the `SettingsResourceScope`
+# for those settings.
+
+DEFAULT_ENUM_NAME = "hashdb_strings"
+DEFAULT_API_URL = "https://hashdb.openanalysis.net"
+HASHDB_PLUGIN_SETTINGS: List[Tuple[str, dict]] = [
+    (
+        "hashdb.url",
+        {
+            "title": "HashDB API URL",
+            "type": "string",
+            "default": DEFAULT_API_URL,
+            "description": "URL of the server used to query HashDB",
+            "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
+        },
+    ),
+    (
+        "hashdb.enum_name",
+        {
+            "title": "Name of enum used for HashDB strings",
+            "type": "string",
+            "default": DEFAULT_ENUM_NAME,
+            "description": "",
+            "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
+        },
+    ),
+    (
+        "hashdb.xor_value",
+        {
+            "title": "XOR key to apply to hash values",
+            "type": "number",
+            "default": 0,
+            "description": "",
+            "ignore": ["SettingsUserScope", "SettingsProjectScope"],
+        },
+    ),
+    (
+        "hashdb.algorithm",
+        {
+            "title": "Hash algorithm used by this database",
+            "type": "string",
+            "optional": True,
+            "description": "",
+            "ignore": ["SettingsUserScope", "SettingsProjectScope"],
+        },
+    ),
+]
+
+def register_settings() -> bool:
+    Settings().register_group("hashdb", "Open Analysis HashDB")
+    for (setting_name, setting_properties) in HASHDB_PLUGIN_SETTINGS:
+        if not Settings().register_setting(setting_name, json.dumps(setting_properties)):
+            logger.log_error(f"Failed to register setting with name {setting_name}, properties {setting_properties}")
+            logger.log_error(f"Abandoning setting registration")
+            return False
+    return True
 
 #--------------------------------------------------------------------------
 # Set xor key
@@ -109,8 +139,8 @@ def set_xor_key(context):
             logger.log_warn("plugin does not currently handle negative values.")
             return
         xor_value = token.value
-        bv.store_metadata("HASHDB_XOR_VALUE", xor_value)
-        logger.log_info(f"XOR key set: {hex(xor_value)}")
+        Settings().set_integer("hashdb.xor_value", xor_value, SettingsScope.SettingsResourceScope)
+        logger.log_info(f"XOR key set: {xor_value:#x}")
         return True
     else:
         logger.log_info(f"failed to set XOR key.")
@@ -126,14 +156,10 @@ def hash_lookup(context):
     """
     bv = context.binaryView
     token = context.token.token
-    HASHDB_XOR_VALUE = 0
-    HASHDB_ALGORITHM = get_hash(bv)
-    try:
-        HASHDB_XOR_VALUE = bv.query_metadata("HASHDB_XOR_VALUE")
-    except:
-        pass
+    hashdb_xor_value = Settings().get_integer_with_scope("hashdb.xor_value", bv, SettingsScope.SettingsResourceScope)[0]
+    hashdb_algorithm = get_hash(bv)
 
-    if HASHDB_ALGORITHM is None:
+    if hashdb_algorithm is None:
         logger.log_error('No hash selected.')
         return
 
@@ -143,11 +169,11 @@ def hash_lookup(context):
             logger.log_warn("plugin does not currently handle negative values.")
             return
         hash_value = token.value
-        hash_value ^= HASHDB_XOR_VALUE
+        hash_value ^= hashdb_xor_value
 
         # Lookup hash
         try:
-            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value, api_url=Settings().get_string("hashdb.url"))
+            hash_results = api.get_strings_from_hash(hashdb_algorithm, hash_value, api_url=Settings().get_string("hashdb.url"))
         except Exception as e:
             logger.log_error(f"API request failed: {e}")
             return
@@ -193,16 +219,17 @@ def hash_lookup(context):
                 if module_name != None:
                     try:
                         #TODO: Background thread
-                        module_hash_list = api.get_module_hashes(module_name, HASHDB_ALGORITHM, hash_string.get('permutation',''), api_url=Settings().get_string("hashdb.url"))
+                        module_hash_list = api.get_module_hashes(module_name, hashdb_algorithm, hash_string.get('permutation',''), api_url=Settings().get_string("hashdb.url"))
                         # Parse hash and string from list into tuple list [(string,hash)]
                         hash_list = []
                         for function_entry in module_hash_list.get('hashes',[]):
                             # If xor is enabled we must convert the hashes
-                            hash_list.append((function_entry.get('string',{}).get('api',''),HASHDB_XOR_VALUE^function_entry.get('hash',0)))
+                            hash_list.append((function_entry.get('string',{}).get('api',''),hashdb_xor_value^function_entry.get('hash',0)))
                         # Add hashes to enum
                         #TODO: Add hashes for the module
                         logger.log_info(hash_list)
-                        add_enums(bv, ENUM_NAME, hash_list)
+                        enum_name = Settings().get_string_with_scope("hashdb.enum_name", bv)[0]
+                        add_enums(bv, enum_name, hash_list)
                         #enum_id = add_enums(ENUM_NAME, enum_list)
                         #if enum_id == None:
                             #idaapi.msg("ERROR: Unable to create or find enum: %s\n" % ENUM_NAME)
@@ -228,24 +255,20 @@ def change_hash(context):
 # Ask for a hash
 #--------------------------------------------------------------------------
 def get_hash(bv):
-    HASHDB_ALGORITHM = None
-    try:
-        HASHDB_ALGORITHM = bv.query_metadata("HASHDB_ALGORITHM")
-    except:
-        pass
+    hashdb_algorithm = Settings().get_string_with_scope("hashdb.algorithm", bv, SettingsScope.SettingsResourceScope)[0]
 
-    if HASHDB_ALGORITHM is None:
+    if hashdb_algorithm is None:
         algorithms = api.get_algorithms(api_url=Settings().get_string("hashdb.url"))
         algorithms.sort()
         algorithm_choice = interaction.get_choice_input("Select an algorithm:", "Algorithms", algorithms)
         if algorithm_choice is not None:
             result = algorithms[algorithm_choice]
-            bv.store_metadata("HASHDB_ALGORITHM", result)
+            Settings().set_string("hashdb.algorithm", result, SettingsScope.SettingsResourceScope)
             return result
         else:
             return None
     else:
-        return HASHDB_ALGORITHM
+        return hashdb_algorithm
 
 #--------------------------------------------------------------------------
 # Dynamic IAT hash scan
@@ -255,16 +278,13 @@ def hash_scan(context):
     Lookup hash from highlighted text
     """
     bv = context.binaryView
-    HASHDB_XOR_VALUE = 0
-    HASHDB_ALGORITHM = get_hash(bv)
-    logger.log_info(f"outside: {HASHDB_ALGORITHM}")
-    try:
-        HASHDB_XOR_VALUE = bv.query_metadata("HASHDB_XOR_VALUE")
-    except:
-        pass
+
+    hashdb_xor_value = Settings().get_integer_with_scope("hashdb.xor_value", bv, SettingsScope.SettingsResourceScope)[0]
+    hashdb_algorithm = get_hash(bv)
+    logger.log_info(f"outside: {hashdb_algorithm}")
 
     # If there is no algorithm give the user a chance to choose one
-    if HASHDB_ALGORITHM == None:
+    if hashdb_algorithm == None:
         logger.log_error("You must select a hash to continue.")
         return
     try:
@@ -272,8 +292,8 @@ def hash_scan(context):
         br.seek(context.address)
         while br.offset < (context.address + context.length):
             hash_value = br.read32()
-            hash_value ^= HASHDB_XOR_VALUE
-            hash_results = api.get_strings_from_hash(HASHDB_ALGORITHM, hash_value, api_url=Settings().get_string("hashdb.url"))
+            hash_value ^= hashdb_xor_value
+            hash_results = api.get_strings_from_hash(hashdb_algorithm, hash_value, api_url=Settings().get_string("hashdb.url"))
 
             # Extract hash info from results
             hash_list = hash_results.get('hashes',[])
@@ -342,16 +362,12 @@ class HuntAlgorithmTask(BackgroundTaskThread):
             msg = """The following algorithms contain a matching hash.
             Select an algorithm to set as the default for this binary."""
             choice = interaction.get_choice_input(msg, "Select a hash", self.match_results)
-            self.context.binaryView.store_metadata("HASHDB_ALGORITHM", self.match_results[choice])
+            Settings().set_string("hashdb.algorithm", self.match_results[choice], self.context.binaryView, SettingsScope.SettingsResourceScope)
 
 
 def hunt_algorithm(context):
     bv = context.binaryView
-    HASHDB_XOR_VALUE = 0
-    try:
-        HASHDB_XOR_VALUE = bv.query_metadata("HASHDB_XOR_VALUE")
-    except:
-        pass
+    hashdb_xor_value = Settings().get_integer_with_scope("hashdb.xor_value", bv, SettingsScope.SettingsResourceScope)[0]
 
     # Get selected hash
     token = context.token.token
@@ -361,7 +377,7 @@ def hunt_algorithm(context):
             logger.log_warn("plugin does not currently handle negative values.")
             return
         hash_value = token.value
-        hash_value ^= HASHDB_XOR_VALUE
+        hash_value ^= hashdb_xor_value
         HuntAlgorithmTask(context=context, hash_value=hash_value).start()
     else:
         logger.log_warn("This token does not look like a valid integer.")
@@ -426,6 +442,9 @@ def plugin_parent_menu() -> str:
     if version and int(version[4:][:4]) >= 3505:
         parent_menu = "Plugins"
     return parent_menu
+
+if not register_settings():
+    logger.log_error("Failed to initialize HashDB plugin settings")
 
 for (action, target, add_to_menu) in [["HashDB\\Hash Lookup", hash_lookup, False],
                          ["HashDB\\Set Xor...", set_xor_key, False],
