@@ -44,17 +44,17 @@ import json
 from typing import List, Tuple
 
 from binaryninja import core_version
-from binaryninjaui import (UIAction, UIActionHandler, Menu)
 from binaryninja.log import Logger
 from binaryninja.settings import Settings
+from binaryninjaui import Menu, UIAction, UIActionHandler
 
 from . import actions
 
 logger = Logger(session_id=0, logger_name=__name__)
 
-#--------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # Global settings
-#--------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 
 # Using a global setting for the URL and enum_name so it can be changed
 # system-wide and replacing the global variable with the settings API so
@@ -110,19 +110,24 @@ HASHDB_PLUGIN_SETTINGS: List[Tuple[str, dict]] = [
     ),
 ]
 
+
 def register_settings() -> bool:
     Settings().register_group("hashdb", "Open Analysis HashDB")
     for (setting_name, setting_properties) in HASHDB_PLUGIN_SETTINGS:
-        if not Settings().register_setting(setting_name, json.dumps(setting_properties)):
-            logger.log_error(f"Failed to register setting with name {setting_name}, properties {setting_properties}")
+        if not Settings().register_setting(
+            setting_name, json.dumps(setting_properties)
+        ):
+            logger.log_error(
+                f"Failed to register setting with name {setting_name}, properties {setting_properties}"
+            )
             logger.log_error(f"Abandoning setting registration")
             return False
     return True
 
 
-#--------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # Plugin Registration
-#--------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 def plugin_parent_menu() -> str:
     parent_menu = "Tools"
     version = core_version()
@@ -130,14 +135,17 @@ def plugin_parent_menu() -> str:
         parent_menu = "Plugins"
     return parent_menu
 
+
 if not register_settings():
     logger.log_error("Failed to initialize HashDB plugin settings")
 
-for (action, target, add_to_menu) in [["HashDB\\Hash Lookup", actions.hash_lookup, False],
-                         ["HashDB\\Set Xor...", actions.set_xor_key, False],
-                         ["HashDB\\Hunt", actions.hunt_algorithm, False],
-                         ["HashDB\\IAT Scan", actions.hash_scan, True],
-                         ["HashDB\\Reset Hash", actions.change_hash, True]]:
+for (action, target, add_to_menu) in [
+    ["HashDB\\Hash Lookup", actions.hash_lookup, False],
+    ["HashDB\\Set Xor...", actions.set_xor_key, False],
+    ["HashDB\\Hunt", actions.hunt_algorithm, False],
+    ["HashDB\\IAT Scan", actions.hash_scan, True],
+    ["HashDB\\Reset Hash", actions.change_hash, True],
+]:
     UIAction.registerAction(action)
     UIActionHandler.globalActions().bindAction(action, UIAction(target))
     if add_to_menu:
