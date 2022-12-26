@@ -58,7 +58,7 @@ def hash_lookup(context: UIActionContext) -> None:
         logger.log_error("HashDB enum name not found.")
         return
 
-    hashdb_algorithm = get_hash(bv)
+    hashdb_algorithm = select_hash_algorithm(bv)
     if hashdb_algorithm is None:
         logger.log_error("No hash algorithm selected.")
         return
@@ -169,15 +169,17 @@ def hash_lookup(context: UIActionContext) -> None:
     return
 
 
-def change_hash(context) -> None:
-    context.binaryView.remove_metadata("HASHDB_ALGORITHM")
-    get_hash(context.binaryView)
+def change_hash_algorithm(context) -> None:
+    Settings().reset(
+        "hashdb.algorithm", context.binaryView, SettingsScope.SettingsResourceScope
+    )
+    select_hash_algorithm(context.binaryView)
 
 
 # --------------------------------------------------------------------------
-# Ask for a hash
+# Ask for a hash algorithm
 # --------------------------------------------------------------------------
-def get_hash(bv: BinaryView) -> Optional[str]:
+def select_hash_algorithm(bv: BinaryView) -> Optional[str]:
     hashdb_api_url = Settings().get_string("hashdb.url")
     if hashdb_api_url is None:
         logger.log_error("HashDB API URL not found.")
@@ -224,7 +226,7 @@ def hash_scan(context: UIActionContext) -> None:
         logger.log_error("HashDB enum name not found.")
         return
 
-    hashdb_algorithm = get_hash(bv)
+    hashdb_algorithm = select_hash_algorithm(bv)
     if hashdb_algorithm is None:
         logger.log_error("No hash algorithm selected.")
         return
@@ -350,7 +352,7 @@ def hunt_algorithm(context: UIActionContext) -> None:
         logger.log_error("HashDB enum name not found.")
         return
 
-    hashdb_algorithm = get_hash(bv)
+    hashdb_algorithm = select_hash_algorithm(bv)
     if hashdb_algorithm is None:
         logger.log_error("No hash algorithm selected.")
         return

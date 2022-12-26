@@ -144,7 +144,7 @@ for (action, target, add_to_menu) in [
     ["HashDB\\Set Xor...", actions.set_xor_key, False],
     ["HashDB\\Hunt", actions.hunt_algorithm, False],
     ["HashDB\\IAT Scan", actions.hash_scan, True],
-    ["HashDB\\Reset Hash", actions.change_hash, True],
+    ["HashDB\\Reset Hash", actions.change_hash_algorithm, True],
 ]:
     UIAction.registerAction(action)
     UIActionHandler.globalActions().bindAction(action, UIAction(target))
