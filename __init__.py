@@ -46,7 +46,7 @@ from typing import List, Tuple
 from binaryninja import core_version
 from binaryninja.log import Logger
 from binaryninja.settings import Settings
-from binaryninjaui import Menu, UIAction, UIActionHandler # type: ignore
+from binaryninjaui import Menu, UIAction, UIActionHandler  # type: ignore
 
 from . import actions
 
@@ -139,6 +139,29 @@ def plugin_parent_menu() -> str:
 if not register_settings():
     logger.log_error("Failed to initialize HashDB plugin settings")
 
+
+def context_menu_creator(context):
+    # This is a hack which uses the `isValid` callback
+    # (which can be passed to the constructor of a UIAction)
+    # in order to register the HashDB actions in the context menu.
+    # This method is taken from the Tanto plugin:
+    # https://github.com/Vector35/tanto/blob/09d5873c85e65458a4e99b45b82c7f22167345ee/__init__.py#L770
+
+    if context is not None:
+        view = context.view
+        if view is not None:
+            context_menu = view.contextMenu()
+
+            if len(context_menu.getActions().keys()) == 0:
+                return context.context and context.binaryView
+
+            context_menu.addAction(f"HashDB\\Hash Lookup", "", 0)
+            context_menu.addAction(f"HashDB\\Hunt", "", 0)
+            return context.context and context.binaryView
+    else:
+        return False
+
+
 for (action, target, add_to_menu) in [
     ["HashDB\\Hash Lookup", actions.hash_lookup, False],
     ["HashDB\\Set Xor...", actions.set_xor_key, False],
@@ -147,6 +170,8 @@ for (action, target, add_to_menu) in [
     ["HashDB\\Reset Hash", actions.change_hash_algorithm, True],
 ]:
     UIAction.registerAction(action)
-    UIActionHandler.globalActions().bindAction(action, UIAction(target))
+    UIActionHandler.globalActions().bindAction(
+        action, UIAction(target, context_menu_creator)
+    )
     if add_to_menu:
         Menu.mainMenu(plugin_parent_menu()).addAction(action, "HashDB")
