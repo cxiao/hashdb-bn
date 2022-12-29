@@ -86,11 +86,23 @@ class HuntMatch:
         return result
 
 
+CONNECTION_ESTABLISH_TIMEOUT = 3
+SERVER_RESPONSE_TIMEOUT = 15
+
+
 def get_algorithms(api_url: str) -> List[Algorithm]:
     request_url = urljoin(api_url, "/hash")
     logger.log_debug(f"get_algorithms requested URL: {request_url}")
 
-    r = requests.get(request_url)
+    try:
+        r = requests.get(
+            request_url, timeout=(CONNECTION_ESTABLISH_TIMEOUT, SERVER_RESPONSE_TIMEOUT)
+        )
+    except (requests.ConnectionError, requests.Timeout) as connection_err:
+        raise HashDBError(
+            f"Get algorithm API request failed for URL {request_url} with a network error: {connection_err}"
+        )
+
     if not r.ok:
         raise HashDBError(
             f"Get algorithm API request failed for URL {request_url} with status code {r.status_code}"
@@ -115,7 +127,14 @@ def get_strings_from_hash(algorithm: str, hash_value: int, api_url: str) -> List
     request_url = urljoin(api_url, f"/hash/{algorithm:s}/{hash_value:d}")
     logger.log_debug(f"get_strings_from_hash requested URL: {request_url}")
 
-    r = requests.get(request_url)
+    try:
+        r = requests.get(
+            request_url, timeout=(CONNECTION_ESTABLISH_TIMEOUT, SERVER_RESPONSE_TIMEOUT)
+        )
+    except (requests.ConnectionError, requests.Timeout) as connection_err:
+        raise HashDBError(
+            f"Get hash API request failed for URL {request_url} with a network error: {connection_err}"
+        )
     if not r.ok:
         raise HashDBError(
             f"Get hash API request failed for URL {request_url} with status code {r.status_code}"
@@ -142,7 +161,14 @@ def get_module_hashes(
     )
     logger.log_debug(f"get_module_hashes requested URL: {request_url}")
 
-    r = requests.get(request_url)
+    try:
+        r = requests.get(
+            request_url, timeout=(CONNECTION_ESTABLISH_TIMEOUT, SERVER_RESPONSE_TIMEOUT)
+        )
+    except (requests.ConnectionError, requests.Timeout) as connection_err:
+        raise HashDBError(
+            f"Get hash API request failed for URL {request_url} with a network error: {connection_err}"
+        )
     if not r.ok:
         raise HashDBError(
             f"Get hash API request failed for URL {request_url} with status code {r.status_code}"
@@ -170,7 +196,17 @@ def hunt_hash(hash_value: int, api_url: str) -> List[HuntMatch]:
         f"hunt_hash requested URL: {request_url} with request data\n{request_data}"
     )
 
-    r = requests.post(request_url, json=request_data)
+    try:
+        r = requests.post(
+            request_url,
+            json=request_data,
+            timeout=(CONNECTION_ESTABLISH_TIMEOUT, SERVER_RESPONSE_TIMEOUT),
+        )
+    except (requests.ConnectionError, requests.Timeout) as connection_err:
+        raise HashDBError(
+            f"Hunt hash API request failed for URL {request_url} with a network error: {connection_err}"
+        )
+
     if not r.ok:
         raise HashDBError(
             f"Hunt hash API request failed for URL {request_url} with status code {r.status_code}, using the following sent request data:\n{request_data}"
