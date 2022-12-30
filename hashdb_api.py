@@ -1,3 +1,11 @@
+"""
+Module for interacting with the HashDB API.
+
+This module performs requests against the API, and provides types representing hash lookup results deserialized from the data returned by the API.
+
+The module can interact with the original service at hashdb.openanalysis.net, or can interact with any other HashDB service instance which conforms to the OpenAPI specification at https://hashdb.openanalysis.net/openapi.json.
+"""
+
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
@@ -13,6 +21,11 @@ class HashDBError(Exception):
 
 @dataclass
 class Algorithm:
+    """
+    Represents the type `components/schemas/algorithm` in the HashDB OpenAPI specification.
+    For example, `GET /hash/{algorithm}` returns an instance of this type of object.
+    """
+
     algorithm: str
     description: str
     type: str
@@ -32,6 +45,11 @@ class Algorithm:
 
 @dataclass
 class HashString:
+    """
+    Represents the type `components/schemas/string` in the HashDB OpenAPI specification.
+    For example, `GET /string/{string}` returns an instance of this type of object.
+    """
+
     string: str
     is_api: bool
     permutation: Optional[str]
@@ -58,6 +76,11 @@ class HashString:
 
 @dataclass
 class Hash:
+    """
+    Represents the type `components/schemas/hash` in the HashDB OpenAPI specification.
+    For example, `GET /hash/{algorithm}/{hash}` returns an array containing this type of object.
+    """
+
     value: int
     hash_string: HashString
 
@@ -72,6 +95,11 @@ class Hash:
 
 @dataclass
 class HuntMatch:
+    """
+    Represents the type `components/schemas/hit` in the HashDB OpenAPI specification.
+    For example, `POST /hunt` returns an array containing this type of object.
+    """
+
     algorithm: str
     count: int
     hitrate: int
@@ -91,6 +119,10 @@ SERVER_RESPONSE_TIMEOUT = 15
 
 
 def get_algorithms(api_url: str) -> List[Algorithm]:
+    """
+    Get a list of all hash algorithms known to this HashDB instance.
+    Results are sorted by algorithm name.
+    """
     request_url = urljoin(api_url, "/hash")
     logger.log_debug(f"get_algorithms requested URL: {request_url}")
 
@@ -124,6 +156,9 @@ def get_algorithms(api_url: str) -> List[Algorithm]:
 
 
 def get_strings_from_hash(algorithm: str, hash_value: int, api_url: str) -> List[Hash]:
+    """
+    Given an algorithm and a hash value, get the corresponding string which produced the hash.
+    """
     request_url = urljoin(api_url, f"/hash/{algorithm:s}/{hash_value:d}")
     logger.log_debug(f"get_strings_from_hash requested URL: {request_url}")
 
@@ -156,6 +191,9 @@ def get_strings_from_hash(algorithm: str, hash_value: int, api_url: str) -> List
 def get_module_hashes(
     module_name: str, algorithm: str, permutation: str, api_url: str
 ) -> List[Hash]:
+    """
+    Given the name of a module (such as a Win32 API library), return a list of the hashes of the names of all APIs which are part of the module.
+    """
     request_url = urljoin(
         api_url, f"/module/{module_name:s}/{algorithm:s}/{permutation:s}"
     )
@@ -188,6 +226,9 @@ def get_module_hashes(
 
 
 def hunt_hash(hash_value: int, api_url: str) -> List[HuntMatch]:
+    """
+    Given a hash value, get a list of possible hash algorithms which could have produced the hash value.
+    """
     matches = []
     hash_list = [hash_value]
     request_url = urljoin(api_url, "/hunt")

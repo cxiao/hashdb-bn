@@ -122,7 +122,7 @@ class HashLookupTask(BackgroundTaskThread):
                 )
                 if module_hash_list is not None:
                     self.add_enums(self.bv, self.hashdb_enum_name, module_hash_list)
-        else:  # Simple case, not an API
+        else:  # Simple case, not an API which may be part of a module; just add a single hash to the enum
             self.add_enums(
                 self.bv, self.hashdb_enum_name, [api.Hash(self.hash_value, hash_string)]
             )
