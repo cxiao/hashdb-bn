@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Self, Type
+from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 import binaryninja
 import requests
@@ -18,7 +18,7 @@ class Algorithm:
     type: str
 
     @classmethod
-    def from_dict(cls: Type[Self], src: Dict[str, Any]) -> Self:
+    def from_dict(cls, src: Dict[str, Any]):
         result = cls(
             algorithm=src["algorithm"],
             description=src["description"],
@@ -39,7 +39,7 @@ class HashString:
     modules: Optional[List[str]]
 
     @classmethod
-    def from_dict(cls: Type[Self], src: Dict[str, Any]) -> Self:
+    def from_dict(cls, src: Dict[str, Any]):
         result = cls(
             string=src["string"],
             is_api=src["is_api"],
@@ -62,7 +62,7 @@ class Hash:
     hash_string: HashString
 
     @classmethod
-    def from_dict(cls: Type[Self], src: Dict[str, Any]) -> Self:
+    def from_dict(cls, src: Dict[str, Any]):
         result = cls(
             value=src["hash"],
             hash_string=HashString.from_dict(src["string"]),
@@ -77,7 +77,7 @@ class HuntMatch:
     hitrate: int
 
     @classmethod
-    def from_dict(cls: Type[Self], src: Dict[str, Any]) -> Self:
+    def from_dict(cls, src: Dict[str, Any]):
         result = cls(
             algorithm=src["algorithm"],
             count=src["count"],
