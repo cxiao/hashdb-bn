@@ -361,7 +361,156 @@ def select_hash_algorithm(bv: BinaryView) -> Optional[str]:
 # --------------------------------------------------------------------------
 # Dynamic IAT hash scan
 # --------------------------------------------------------------------------
-def hash_scan(context: UIActionContext) -> None:
+class MultipleHashLookupTask(BackgroundTaskThread):
+    def __init__(
+        self,
+        bv: BinaryView,
+        hashdb_api_url: str,
+        hashdb_enum_name: str,
+        hashdb_algorithm: str,
+        hashdb_xor_value: int,
+        hash_values: List[int],
+    ):
+        super().__init__(
+            initial_progress_text="[HashDB] Hash scan task starting...",
+            can_cancel=False,
+        )
+
+        self.bv = bv
+        self.hashdb_api_url = hashdb_api_url
+        self.hashdb_enum_name = hashdb_enum_name
+        self.hashdb_algorithm = hashdb_algorithm
+        self.hashdb_xor_value = hashdb_xor_value
+        self.hash_values = hash_values
+
+    def run(self):
+        collected_hash_values: List[List[api.Hash]] = []
+        for hash_value in self.hash_values:
+            hash_results = self.call_api_get_strings_from_hash(self.hashdb_api_url, self.hashdb_algorithm, hash_value)
+            if hash_results is None or len(hash_results) == 0:
+                continue
+            else:
+                collected_hash_values.append(hash_results)
+
+        for collected_hash_value in collected_hash_values:
+            if len(collected_hash_value) == 1:
+                self.add_enums(self.bv, self.hashdb_enum_name, collected_hash_value)
+            else:
+                output_user_choose_hash_from_collisions: List[Optional[api.HashString]] = [
+                    None
+                ]
+                user_choose_hash_from_collisions_fn = partial(
+                    self.user_choose_hash_from_collisions,
+                    collected_hash_value,
+                    output_hash_string=output_user_choose_hash_from_collisions,
+                )
+                execute_on_main_thread_and_wait(user_choose_hash_from_collisions_fn)
+                hash_string = output_user_choose_hash_from_collisions[0]
+
+                if hash_string is not None:
+                    self.add_enums(self.bv, self.hashdb_enum_name, [api.Hash(collected_hash_value[0].value, hash_string)])
+    
+    def user_choose_hash_from_collisions(
+        self,
+        hash_candidates: List[api.Hash],
+        output_hash_string: List[Optional[api.HashString]],
+    ):
+        # Multiple hashes found
+        # Allow the user to select the best match
+        collisions: Dict[str, api.HashString] = {}
+        for hash_candidate in hash_candidates:
+            collisions[
+                hash_candidate.hash_string.get_api_string_if_available()
+            ] = hash_candidate.hash_string
+
+        choice_idx = interaction.get_choice_input(
+            "Select the best match: ", "String Selection", list(collisions.keys())
+        )
+        if choice_idx is not None:
+            choice = list(collisions.keys())[choice_idx]
+        else:
+            # User cancelled, select the first one?
+            choice = list(collisions.keys())[0]
+
+        output_hash_string[0] = collisions[choice]
+
+    def add_enums(
+        self, bv: BinaryView, enum_name: str, hash_list: List[api.Hash]
+    ) -> None:
+        # TODO: Normalize enum names, and fix potentially invalid enum names
+
+        existing_type = bv.types.get(enum_name)
+        if existing_type is None:
+            # Create a new enum
+            with EnumerationBuilder.builder(bv, QualifiedName(enum_name)) as new_enum:
+                new_enum = cast(EnumerationBuilder, new_enum)  # typing
+                for hash_ in hash_list:
+                    enum_value_name = hash_.hash_string.get_api_string_if_available()
+                    enum_value = hash_.value
+                    new_enum.append(enum_value_name, enum_value)
+        else:
+            # Modify an existing enum
+            if existing_type.type_class == TypeClass.EnumerationTypeClass:
+                with Type.builder(bv, QualifiedName(enum_name)) as existing_enum:
+                    existing_enum = cast(EnumerationBuilder, existing_enum)  # typing
+                    # In Binary Ninja, enumeration members are not guaranteed to be unique.
+                    # It is possible to have 2 different enum members
+                    # with exactly the same name and the same value.
+                    # Therefore, we must take care to _replace_ any existing enum member
+                    # with the same name as the enum member we would like to add,
+                    # rather than _appending_ a duplicate member with the same name.
+
+                    # Create a list of member names to use for lookup.
+                    # EnumerationBuilder.replace requires a member index as an argument,
+                    # so we must save the original member index as well.
+                    member_dict = {
+                        member.name: idx
+                        for (idx, member) in enumerate(existing_enum.members)
+                    }
+
+                    for hash_ in hash_list:
+                        enum_value_name = (
+                            hash_.hash_string.get_api_string_if_available()
+                        )
+                        enum_value = hash_.value
+                        enum_member_idx = member_dict.get(enum_value_name)
+                        if enum_member_idx is not None:
+                            existing_enum.replace(
+                                enum_member_idx,  # original member idx
+                                enum_value_name,  # new name
+                                enum_value,  # new value
+                            )
+                            # TODO: It's possible here that the user would like to
+                            # always ignore any duplicate enum members,
+                            # rather than always replacing them.
+                            # Consider how to handle this in the future.
+                        else:
+                            # Enum member with this name doesn't yet exist
+                            existing_enum.append(
+                                enum_value_name,  # new name
+                                enum_value,  # new value
+                            )
+            else:
+                logger.log_error(
+                    f"Enum values could not be added; a non-enum type with the name {enum_name} already exists."
+                )
+
+
+    def call_api_get_strings_from_hash(
+        self, hashdb_api_url: str, hashdb_algorithm: str, hash_value: int
+    ) -> Optional[List[api.Hash]]:
+        try:
+            hash_results = api.get_strings_from_hash(
+                hashdb_algorithm,
+                hash_value,
+                hashdb_api_url,
+            )
+            return hash_results
+        except api.HashDBError as api_error:
+            logger.log_error(f"HashDB API request failed: {api_error}")
+            return None
+
+def multiple_hash_lookup(context: UIActionContext) -> None:
     """
     Lookup hash from highlighted text
     """
@@ -386,58 +535,37 @@ def hash_scan(context: UIActionContext) -> None:
         "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
     )[0]
 
+    # TODO: Handle 64 bit hashes
     try:
         br = BinaryReader(bv, bv.endianness)
         br.seek(context.address)
+
+        selected_integer_values = []
+        selected_address_range_end = br.offset
         while br.offset < (context.address + context.length):
-            hash_value = br.read32()
-            if hash_value is not None:
-                hash_value ^= hashdb_xor_value
+            selected_integer_value = br.read32()
+            if selected_integer_value is not None:
+                selected_integer_values.append(selected_integer_value)
+                selected_address_range_end = br.offset
             else:
-                logger.log_error("Highlighted text is not a valid integer.")
-                return
+                logger.log_warn(f"Could not read value at address {br.offset:#x} as 32-bit integer; only submitting hashes read up to this address for analysis.")
+                break
 
-            hash_results = api.get_strings_from_hash(
-                hashdb_algorithm, hash_value, hashdb_api_url
-            )
+        logger.log_info(f"Found {len(selected_integer_values)} 32-bit integer values which are potential hashes, from address {context.address:#x} to {selected_address_range_end:#x}. Submitting values...")
+        for selected_integer_value in selected_integer_values:
+            logger.log_debug(f"Found value {selected_integer_value:#x}")
+        
+        MultipleHashLookupTask(
+            bv=bv,
+            hashdb_api_url=hashdb_api_url,
+            hashdb_enum_name=hashdb_enum_name,
+            hashdb_algorithm=hashdb_algorithm,
+            hashdb_xor_value=hashdb_xor_value,
+            hash_values=selected_integer_values,
+        ).start()
 
-            # Extract hash info from results
-            hash_list = hash_results.get("hashes", [])
-            if len(hash_list) == 0:
-                # No hash found
-                # Increment the counter and continue
-                continue
-            elif len(hash_list) == 1:
-                hash_string = hash_list[0].get("string", {})
-            else:
-                collisions = {}
-                for string_match in hash_list:
-                    string_value = string_match.get("string", "")
-                    if string_value.get("is_api", False):
-                        collisions[string_value.get("api", "")] = string_value
-                    else:
-                        collisions[string_value.get("string", "")] = string_value
-                hash_choice = interaction.get_choice_input(
-                    "Select the best hash: ", "Hash Selection", collisions.keys()
-                )
-                if hash_choice is not None:
-                    hash_string = list(collisions.keys())[hash_choice]
-                else:
-                    # User cancelled, select the first one?
-                    hash_string = list(collisions.keys())[0]
-
-            # Parse string from hash_string match
-            if hash_string.get("is_api", False):
-                string_value = hash_string.get("api", "")
-            else:
-                string_value = hash_string.get("string", "")
-            logger.log_info(f"Hash match found: {string_value}")
-            # Add hash to enum
-            # TODO
-    except Exception as e:
-        logger.log_error(f"ERROR: {e}")
-        return
-    return
+    except Exception as err:
+        logger.log_error("Error trying to read highlighted text: {err}")
 
 
 # --------------------------------------------------------------------------

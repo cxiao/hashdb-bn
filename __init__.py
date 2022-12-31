@@ -156,6 +156,7 @@ def context_menu_creator(context):
                 return context.context and context.binaryView
 
             context_menu.addAction(f"HashDB\\Hash Lookup", "", 0)
+            context_menu.addAction(f"HashDB\\Multiple Hash Lookup", "", 0)
             context_menu.addAction(f"HashDB\\Hunt", "", 0)
             return context.context and context.binaryView
     else:
@@ -166,7 +167,7 @@ for (action, target, add_to_menu) in [
     ["HashDB\\Hash Lookup", actions.hash_lookup, False],
     ["HashDB\\Set Xor...", actions.set_xor_key, False],
     ["HashDB\\Hunt", actions.hunt_algorithm, False],
-    ["HashDB\\IAT Scan", actions.hash_scan, True],
+    ["HashDB\\Multiple Hash Lookup", actions.multiple_hash_lookup, True],
     ["HashDB\\Reset Hash", actions.change_hash_algorithm, True],
 ]:
     UIAction.registerAction(action)
