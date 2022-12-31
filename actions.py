@@ -1,4 +1,4 @@
-from typing import cast, Dict, List, Optional, Tuple
+from typing import cast, Dict, List, Optional, Union
 from functools import partial
 
 from binaryninja import BinaryReader, BinaryView, interaction
@@ -384,32 +384,41 @@ class MultipleHashLookupTask(BackgroundTaskThread):
         self.hash_values = hash_values
 
     def run(self):
-        collected_hash_values: List[List[api.Hash]] = []
-        for hash_value in self.hash_values:
-            hash_results = self.call_api_get_strings_from_hash(self.hashdb_api_url, self.hashdb_algorithm, hash_value)
-            if hash_results is None or len(hash_results) == 0:
-                continue
-            else:
-                collected_hash_values.append(hash_results)
+        collected_hash_values: List[Union[List[api.Hash], api.HashDBError]] = []
+        collected_hash_values = api.get_strings_from_hashes(
+            self.hashdb_algorithm, self.hash_values, self.hashdb_api_url
+        )
 
         for collected_hash_value in collected_hash_values:
-            if len(collected_hash_value) == 1:
-                self.add_enums(self.bv, self.hashdb_enum_name, collected_hash_value)
-            else:
-                output_user_choose_hash_from_collisions: List[Optional[api.HashString]] = [
-                    None
-                ]
-                user_choose_hash_from_collisions_fn = partial(
-                    self.user_choose_hash_from_collisions,
-                    collected_hash_value,
-                    output_hash_string=output_user_choose_hash_from_collisions,
-                )
-                execute_on_main_thread_and_wait(user_choose_hash_from_collisions_fn)
-                hash_string = output_user_choose_hash_from_collisions[0]
+            if isinstance(collected_hash_value, api.HashDBError):
+                logger.log_error(f"HashDB API request failed: {collected_hash_value}")
+                self.finish()
+                return
+            elif isinstance(collected_hash_value, List):
+                if len(collected_hash_value) == 0:
+                    self.finish()
+                    return
+                if len(collected_hash_value) == 1:
+                    self.add_enums(self.bv, self.hashdb_enum_name, collected_hash_value)
+                else:
+                    output_user_choose_hash_from_collisions: List[
+                        Optional[api.HashString]
+                    ] = [None]
+                    user_choose_hash_from_collisions_fn = partial(
+                        self.user_choose_hash_from_collisions,
+                        collected_hash_value,
+                        output_hash_string=output_user_choose_hash_from_collisions,
+                    )
+                    execute_on_main_thread_and_wait(user_choose_hash_from_collisions_fn)
+                    hash_string = output_user_choose_hash_from_collisions[0]
 
-                if hash_string is not None:
-                    self.add_enums(self.bv, self.hashdb_enum_name, [api.Hash(collected_hash_value[0].value, hash_string)])
-    
+                    if hash_string is not None:
+                        self.add_enums(
+                            self.bv,
+                            self.hashdb_enum_name,
+                            [api.Hash(collected_hash_value[0].value, hash_string)],
+                        )
+
     def user_choose_hash_from_collisions(
         self,
         hash_candidates: List[api.Hash],
@@ -495,7 +504,6 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                     f"Enum values could not be added; a non-enum type with the name {enum_name} already exists."
                 )
 
-
     def call_api_get_strings_from_hash(
         self, hashdb_api_url: str, hashdb_algorithm: str, hash_value: int
     ) -> Optional[List[api.Hash]]:
@@ -509,6 +517,7 @@ class MultipleHashLookupTask(BackgroundTaskThread):
         except api.HashDBError as api_error:
             logger.log_error(f"HashDB API request failed: {api_error}")
             return None
+
 
 def multiple_hash_lookup(context: UIActionContext) -> None:
     """
@@ -548,13 +557,17 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
                 selected_integer_values.append(selected_integer_value)
                 selected_address_range_end = br.offset
             else:
-                logger.log_warn(f"Could not read value at address {br.offset:#x} as 32-bit integer; only submitting hashes read up to this address for analysis.")
+                logger.log_warn(
+                    f"Could not read value at address {br.offset:#x} as 32-bit integer; only submitting hashes read up to this address for analysis."
+                )
                 break
 
-        logger.log_info(f"Found {len(selected_integer_values)} 32-bit integer values which are potential hashes, from address {context.address:#x} to {selected_address_range_end:#x}. Submitting values...")
+        logger.log_info(
+            f"Found {len(selected_integer_values)} 32-bit integer values which are potential hashes, from address {context.address:#x} to {selected_address_range_end:#x}. Submitting values..."
+        )
         for selected_integer_value in selected_integer_values:
             logger.log_debug(f"Found value {selected_integer_value:#x}")
-        
+
         MultipleHashLookupTask(
             bv=bv,
             hashdb_api_url=hashdb_api_url,

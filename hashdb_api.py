@@ -6,8 +6,9 @@ This module performs requests against the API, and provides types representing h
 The module can interact with the original service at hashdb.openanalysis.net, or can interact with any other HashDB service instance which conforms to the OpenAPI specification at https://hashdb.openanalysis.net/openapi.json.
 """
 
+import asyncio
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 import binaryninja
 import httpx
@@ -181,6 +182,60 @@ def get_strings_from_hash(algorithm: str, hash_value: int, api_url: str) -> List
             f"Could not parse the following response from URL {request_url} as a valid list of hashes; parsing failed to find required key {parsing_key_error}:\n{results}"
         )
     return hashes
+
+
+async def _get_strings_from_hashes_inner(
+    algorithm: str, hash_values: List[int], api_url: str
+) -> List[Union[List[Hash], HashDBError]]:
+    async def request_task(client, request_url) -> List[Hash]:
+        logger.log_debug(f"get_strings_from_hashes requested URL: {request_url}")
+        try:
+            r = await client.get(request_url, timeout=TIMEOUT)
+        except httpx.RequestError as connection_err:
+            raise HashDBError(
+                f"Get hash API request failed for URL {request_url} with a network error: {connection_err}"
+            )
+        if not r.is_success:
+            raise HashDBError(
+                f"Get hash API request failed for URL {request_url} with status code {r.status_code}"
+            )
+
+        results = r.json()
+        logger.log_debug(
+            f"get_strings_from_hash request to URL: {request_url} returned results\n{results}"
+        )
+
+        try:
+            hashes = [Hash.from_dict(hash_) for hash_ in results["hashes"]]
+        except KeyError as parsing_key_error:
+            raise HashDBError(
+                f"Could not parse the following response from URL {request_url} as a valid list of hashes; parsing failed to find required key {parsing_key_error}:\n{results}"
+            )
+        return hashes
+
+    request_urls = [
+        urljoin(api_url, f"/hash/{algorithm:s}/{hash_value:d}")
+        for hash_value in hash_values
+    ]
+    request_tasks = []
+
+    async with httpx.AsyncClient() as client:
+        for request_url in request_urls:
+            request_tasks.append(
+                asyncio.ensure_future(request_task(client, request_url))
+            )
+
+        hash_results = await asyncio.gather(*request_tasks, return_exceptions=True)
+        return hash_results
+
+
+def get_strings_from_hashes(
+    algorithm: str, hash_values: List[int], api_url: str
+) -> List[Union[List[Hash], HashDBError]]:
+    """
+    Given an algorithm and a list of hash values, get the corresponding strings which produced the hashes.
+    """
+    return asyncio.run(_get_strings_from_hashes_inner(algorithm, hash_values, api_url))
 
 
 def get_module_hashes(
