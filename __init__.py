@@ -14,7 +14,9 @@
 ## HashDB is a community-sourced library of hashing algorithms used in malware.
 ## New hash algorithms can be added here: https://github.com/OALabs/hashdb
 ##
-## Rewritten for Binary Ninja by @psifertex, original IDA plugin by @herrcore
+## Maintained by Cindy Xiao <contact@cxiao.net>
+## Originally rewritten for Binary Ninja by @psifertex
+## Original IDA plugin by @herrcore
 ##
 ## To install:
 ##      - Install via the plugin manager! Or...
