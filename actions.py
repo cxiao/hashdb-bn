@@ -208,8 +208,6 @@ class HashLookupTask(BackgroundTaskThread):
     def add_enums(
         self, bv: BinaryView, enum_name: str, hash_list: List[api.Hash]
     ) -> None:
-        # TODO: Normalize enum names, and fix potentially invalid enum names
-
         existing_type = bv.types.get(enum_name)
         if existing_type is None:
             # Create a new enum
@@ -251,10 +249,6 @@ class HashLookupTask(BackgroundTaskThread):
                                 enum_value_name,  # new name
                                 enum_value,  # new value
                             )
-                            # TODO: It's possible here that the user would like to
-                            # always ignore any duplicate enum members,
-                            # rather than always replacing them.
-                            # Consider how to handle this in the future.
                         else:
                             # Enum member with this name doesn't yet exist
                             existing_enum.append(
@@ -446,8 +440,6 @@ class MultipleHashLookupTask(BackgroundTaskThread):
     def add_enums(
         self, bv: BinaryView, enum_name: str, hash_list: List[api.Hash]
     ) -> None:
-        # TODO: Normalize enum names, and fix potentially invalid enum names
-
         existing_type = bv.types.get(enum_name)
         if existing_type is None:
             # Create a new enum
@@ -489,10 +481,6 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                                 enum_value_name,  # new name
                                 enum_value,  # new value
                             )
-                            # TODO: It's possible here that the user would like to
-                            # always ignore any duplicate enum members,
-                            # rather than always replacing them.
-                            # Consider how to handle this in the future.
                         else:
                             # Enum member with this name doesn't yet exist
                             existing_enum.append(
@@ -544,7 +532,6 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
         "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
     )[0]
 
-    # TODO: Handle 64 bit hashes
     try:
         br = BinaryReader(bv, bv.endianness)
         br.seek(context.address)

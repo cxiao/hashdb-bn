@@ -35,8 +35,6 @@
 ##          3-Clause license.
 ##
 ## Todo:
-##          Create background threads for blocking tasks
-##          Actually create enums, or investigate alternatives (vs just logging for now)
 ##          Test IAT creation method
 ##          Use new Workflows API to re-write function calls to the import
 ##
