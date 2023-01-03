@@ -17,6 +17,7 @@ from . import hashdb_api as api
 
 logger = Logger(session_id=0, logger_name=__name__)
 
+
 # --------------------------------------------------------------------------
 # Set xor key
 # --------------------------------------------------------------------------
@@ -122,10 +123,12 @@ class HashLookupTask(BackgroundTaskThread):
                 )
                 if module_hash_list is not None:
                     self.add_enums(self.bv, self.hashdb_enum_name, module_hash_list)
+                    self.bv.update_analysis_and_wait()
         else:  # Simple case, not an API which may be part of a module; just add a single hash to the enum
             self.add_enums(
                 self.bv, self.hashdb_enum_name, [api.Hash(self.hash_value, hash_string)]
             )
+            self.bv.update_analysis_and_wait()
         self.finish()
         return
 
@@ -394,6 +397,7 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                     return
                 if len(collected_hash_value) == 1:
                     self.add_enums(self.bv, self.hashdb_enum_name, collected_hash_value)
+                    self.bv.update_analysis_and_wait()
                 else:
                     output_user_choose_hash_from_collisions: List[
                         Optional[api.HashString]
@@ -412,6 +416,10 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                             self.hashdb_enum_name,
                             [api.Hash(collected_hash_value[0].value, hash_string)],
                         )
+                        self.bv.update_analysis_and_wait()
+
+        self.finish()
+        return
 
     def user_choose_hash_from_collisions(
         self,
