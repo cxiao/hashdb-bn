@@ -1,13 +1,14 @@
 {
     "pluginmetadataversion": 2,
-    "name": "HashDB Plugin",
+    "name": "HashDB",
     "type": [
-        "ui"
+        "ui",
+        "helper"
     ],
     "api": [
         "python3"
     ],
-    "description": "Plugin for interacting with the OALABS HashDB service.",
+    "description": "Plugin for interacting with the OALabs HashDB service.",
     "longdescription": "",
     "license": {
         "name": "3-Clause BSD",
