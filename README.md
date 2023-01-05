@@ -22,6 +22,12 @@ The enum type can then be applied to variables in the database.
 
 The name of the enum type created (by default `hashdb_strings`) can be changed in Binary Ninja's settings, under _HashDB > HashDB Enum Name_.
 
+### Keyboard shortcuts
+
+Keyboard shortcuts can be set for this plugin's commands from Binary Ninja's Keybindings interface (_Edit > Preferences > Keybindings_). The command list can be filtered to show only the HashDB plugin's commands by searching `HashDB` in the Keybindings search box.
+
+The plugin currently does not ship with any keyboard shortcuts set by default.
+
 ## Installation
 
 This plugin can be installed via either:
