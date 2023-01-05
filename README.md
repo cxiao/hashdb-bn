@@ -6,6 +6,22 @@
 
 ![](images/hashlookup-result-screenshot-border.png)
 
+## Usage
+
+### Viewing and applying found hashes
+
+Found hashes are added as enum entries under the `hashdb_strings` enum type, and can be viewed in the _Types_ menu. The resolved hash string is set as the name of the enum entry.
+
+All newly found hashes are appended as enum entries to this type.
+
+![](images/hash-created-enum-screenshot-border.png)
+
+The enum type can then be applied to variables in the database.
+
+![](images/hash-created-enum-applied-function-arg-screenshot-border.png)
+
+The name of the enum type created (by default `hashdb_strings`) can be changed in Binary Ninja's settings, under _HashDB > HashDB Enum Name_.
+
 ## Installation
 
 This plugin can be installed via either:
