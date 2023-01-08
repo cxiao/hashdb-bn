@@ -179,7 +179,9 @@ class HashLookupTask(BackgroundTaskThread):
             ] = hash_candidate.hash_string
 
         choice_idx = interaction.get_choice_input(
-            "Select the best match: ", "String Selection", list(collisions.keys())
+            "Select the best match: ",
+            "[HashDB] String Selection",
+            list(collisions.keys()),
         )
         if choice_idx is not None:
             choice = list(collisions.keys())[choice_idx]
@@ -198,7 +200,7 @@ class HashLookupTask(BackgroundTaskThread):
         modules.sort()
         choice_idx = interaction.get_choice_input(
             f"The hash for {resolved_string_value} is a module function.\n\nDo you want to import all function hashes from this module?",
-            "HashDB Bulk Import",
+            "[HashDB] Bulk Import",
             modules,
         )
         if choice_idx is not None:
@@ -284,8 +286,8 @@ def hash_lookup(context: UIActionContext) -> None:
     hashdb_algorithm = Settings().get_string_with_scope("hashdb.algorithm", bv)[0]
     if hashdb_algorithm is None or hashdb_algorithm == "":
         interaction.show_message_box(
-            "[HashDB] Algorithm selection required",
-            "[HashDB] Please select an algorithm before looking up a hash.\n\nYou can hunt for the correct algorithm for a hash by using the HashDB > Hunt command.",
+            "[HashDB] Algorithm Selection Required",
+            "Please select an algorithm before looking up a hash.\n\nYou can hunt for the correct algorithm for a hash by using the HashDB > Hunt command.",
         )
         logger.log_warn("Algorithm selection is required before looking up hashes.")
         return
@@ -340,7 +342,7 @@ def select_hash_algorithm(bv: BinaryView) -> Optional[str]:
             return None
 
         algorithm_choice = interaction.get_choice_input(
-            "Select an algorithm:", "Algorithms", algorithms
+            "Select an algorithm:", "[HashDB] Algorithm Selection", algorithms
         )
         if algorithm_choice is not None:
             result = algorithms[algorithm_choice].algorithm
@@ -437,7 +439,9 @@ class MultipleHashLookupTask(BackgroundTaskThread):
             ] = hash_candidate.hash_string
 
         choice_idx = interaction.get_choice_input(
-            "Select the best match: ", "String Selection", list(collisions.keys())
+            "Select the best match: ",
+            "[HashDB] String Selection",
+            list(collisions.keys()),
         )
         if choice_idx is not None:
             choice = list(collisions.keys())[choice_idx]
@@ -536,8 +540,8 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
     hashdb_algorithm = Settings().get_string_with_scope("hashdb.algorithm", bv)[0]
     if hashdb_algorithm is None or hashdb_algorithm == "":
         interaction.show_message_box(
-            "[HashDB] Algorithm selection required",
-            "[HashDB] Please select an algorithm before looking up a hash.\n\nYou can hunt for the correct algorithm for a hash by using the HashDB > Hunt command.",
+            "[HashDB] Algorithm Selection Required",
+            "Please select an algorithm before looking up a hash.\n\nYou can hunt for the correct algorithm for a hash by using the HashDB > Hunt command.",
         )
         logger.log_warn("Algorithm selection is required before looking up hashes.")
         return
@@ -598,7 +602,9 @@ class HuntAlgorithmTask(BackgroundTaskThread):
     def run(self):
         match_results = self.call_api(self.hashdb_api_url, self.hash_value)
         if match_results is None or len(match_results) == 0:
-            interaction.show_message_box("No Match", "No algorithms matched the hash.")
+            interaction.show_message_box(
+                "[HashDB] No Match", "No algorithms matched the hash."
+            )
         else:
             user_choose_match_fn = partial(self.user_choose_match, match_results)
             execute_on_main_thread(user_choose_match_fn)
@@ -619,9 +625,10 @@ class HuntAlgorithmTask(BackgroundTaskThread):
             return None
 
     def user_choose_match(self, match_results: List[api.HuntMatch]) -> None:
-        msg = """The following algorithms contain a matching hash.
-            Select an algorithm to set as the default for this binary."""
-        choice_idx = interaction.get_choice_input(msg, "Select a hash", match_results)
+        msg = """The following algorithms contain a matching hash.\n\nSelect an algorithm to set as the default for this binary."""
+        choice_idx = interaction.get_choice_input(
+            msg, "[HashDB] Algorithm Selection", match_results
+        )
         if choice_idx is not None:
             Settings().set_string(
                 key="hashdb.algorithm",
