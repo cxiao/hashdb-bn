@@ -326,7 +326,7 @@ def change_hash_algorithm(context) -> None:
 # --------------------------------------------------------------------------
 def select_hash_algorithm(bv: BinaryView) -> Optional[str]:
     hashdb_api_url = Settings().get_string("hashdb.url")
-    if hashdb_api_url is None:
+    if hashdb_api_url is None or hashdb_api_url == "":
         logger.log_error("HashDB API URL not found.")
         return
 
@@ -644,12 +644,12 @@ def hunt_algorithm(context: UIActionContext) -> None:
     bv = context.binaryView
 
     hashdb_api_url = Settings().get_string("hashdb.url")
-    if hashdb_api_url is None:
+    if hashdb_api_url is None or hashdb_api_url == "":
         logger.log_error("HashDB API URL not found.")
         return
 
     hashdb_enum_name = Settings().get_string_with_scope("hashdb.enum_name", bv)[0]
-    if hashdb_enum_name is None:
+    if hashdb_enum_name is None or hashdb_enum_name == "":
         logger.log_error("HashDB enum name not found.")
         return
 
