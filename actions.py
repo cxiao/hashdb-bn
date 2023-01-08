@@ -272,21 +272,23 @@ def hash_lookup(context: UIActionContext) -> None:
     token = context.token.token
 
     hashdb_api_url = Settings().get_string("hashdb.url")
-    if hashdb_api_url is None:
+    if hashdb_api_url is None or hashdb_api_url == "":
         logger.log_error("HashDB API URL not found.")
         return
 
     hashdb_enum_name = Settings().get_string_with_scope("hashdb.enum_name", bv)[0]
-    if hashdb_enum_name is None:
+    if hashdb_enum_name is None or hashdb_enum_name == "":
         logger.log_error("HashDB enum name not found.")
         return
 
     hashdb_algorithm = Settings().get_string_with_scope("hashdb.algorithm", bv)[0]
-    if hashdb_algorithm is None:
-        hashdb_algorithm = select_hash_algorithm(bv)
-        if hashdb_algorithm is None:
-            logger.log_error("No hash algorithm selected.")
-            return
+    if hashdb_algorithm is None or hashdb_algorithm == "":
+        interaction.show_message_box(
+            "[HashDB] Algorithm selection required",
+            "[HashDB] Please select an algorithm before looking up a hash.\n\nYou can hunt for the correct algorithm for a hash by using the HashDB > Hunt command.",
+        )
+        logger.log_warn("Algorithm selection is required before looking up hashes.")
+        return
 
     hashdb_xor_value = Settings().get_integer_with_scope(
         "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
@@ -522,18 +524,22 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
     bv = context.binaryView
 
     hashdb_api_url = Settings().get_string("hashdb.url")
-    if hashdb_api_url is None:
+    if hashdb_api_url is None or hashdb_api_url == "":
         logger.log_error("HashDB API URL not found.")
         return
 
     hashdb_enum_name = Settings().get_string_with_scope("hashdb.enum_name", bv)[0]
-    if hashdb_enum_name is None:
+    if hashdb_enum_name is None or hashdb_enum_name == "":
         logger.log_error("HashDB enum name not found.")
         return
 
-    hashdb_algorithm = select_hash_algorithm(bv)
-    if hashdb_algorithm is None:
-        logger.log_error("No hash algorithm selected.")
+    hashdb_algorithm = Settings().get_string_with_scope("hashdb.algorithm", bv)[0]
+    if hashdb_algorithm is None or hashdb_algorithm == "":
+        interaction.show_message_box(
+            "[HashDB] Algorithm selection required",
+            "[HashDB] Please select an algorithm before looking up a hash.\n\nYou can hunt for the correct algorithm for a hash by using the HashDB > Hunt command.",
+        )
+        logger.log_warn("Algorithm selection is required before looking up hashes.")
         return
 
     hashdb_xor_value = Settings().get_integer_with_scope(
