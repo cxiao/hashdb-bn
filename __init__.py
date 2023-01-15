@@ -81,30 +81,30 @@ HASHDB_PLUGIN_SETTINGS: List[Tuple[str, dict]] = [
     (
         "hashdb.enum_name",
         {
-            "title": "Name of enum used for HashDB strings",
+            "title": "HashDB Enum Name",
             "type": "string",
             "default": DEFAULT_ENUM_NAME,
-            "description": "",
+            "description": "Name of enum used for HashDB strings",
             "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
         },
     ),
     (
         "hashdb.xor_value",
         {
-            "title": "XOR key to apply to hash values",
+            "title": "HashDB XOR Key",
             "type": "number",
             "default": 0,
-            "description": "",
+            "description": "XOR key to apply to hash values. This setting is specific to a particular analysis database.",
             "ignore": ["SettingsUserScope", "SettingsProjectScope"],
         },
     ),
     (
         "hashdb.algorithm",
         {
-            "title": "Hash algorithm used by this database",
+            "title": "HashDB Hash Algorithm",
             "type": "string",
             "optional": True,
-            "description": "",
+            "description": "Hash algorithm used for the current binary. This setting is specific to a particular analysis database.",
             "ignore": ["SettingsUserScope", "SettingsProjectScope"],
         },
     ),
@@ -112,8 +112,8 @@ HASHDB_PLUGIN_SETTINGS: List[Tuple[str, dict]] = [
 
 
 def register_settings() -> bool:
-    Settings().register_group("hashdb", "Open Analysis HashDB")
-    for (setting_name, setting_properties) in HASHDB_PLUGIN_SETTINGS:
+    Settings().register_group("hashdb", "HashDB")
+    for setting_name, setting_properties in HASHDB_PLUGIN_SETTINGS:
         if not Settings().register_setting(
             setting_name, json.dumps(setting_properties)
         ):
@@ -163,9 +163,9 @@ def context_menu_creator(context):
         return False
 
 
-for (action, target, add_to_menu) in [
+for action, target, add_to_menu in [
     ["HashDB\\Hash Lookup", actions.hash_lookup, False],
-    ["HashDB\\Set Xor...", actions.set_xor_key, False],
+    ["HashDB\\Set XOR Key...", actions.set_xor_key, False],
     ["HashDB\\Hunt", actions.hunt_algorithm, False],
     ["HashDB\\Multiple Hash Lookup", actions.multiple_hash_lookup, True],
     ["HashDB\\Reset Hash", actions.change_hash_algorithm, True],
