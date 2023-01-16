@@ -1,8 +1,9 @@
 from typing import cast, Dict, List, Optional, Union
 from functools import partial
+import struct
 
 from binaryninja import BinaryReader, BinaryView, interaction
-from binaryninja.enums import InstructionTextTokenType, TypeClass
+from binaryninja.enums import Endianness, InstructionTextTokenType, TypeClass
 from binaryninja.log import Logger
 from binaryninja.mainthread import (
     execute_on_main_thread,
@@ -271,7 +272,6 @@ def hash_lookup(context: UIActionContext) -> None:
     Lookup hash from highlighted text
     """
     bv = context.binaryView
-    token = context.token.token
 
     hashdb_api_url = Settings().get_string("hashdb.url")
     if hashdb_api_url is None or hashdb_api_url == "":
@@ -296,22 +296,56 @@ def hash_lookup(context: UIActionContext) -> None:
         "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
     )[0]
 
-    if token and token.type == InstructionTextTokenType.IntegerToken:
-        if token.text.startswith("-"):
-            # Handle negatives later
-            logger.log_warn("plugin does not currently handle negative values.")
-            return
-        hash_value = token.value
-        hash_value ^= hashdb_xor_value
+    if context.token.token:
+        token = context.token.token
+        if token.type == InstructionTextTokenType.IntegerToken:
+            if token.text.startswith("-"):
+                # Handle negatives later
+                logger.log_warn("plugin does not currently handle negative values.")
+                return
+            hash_value = token.value
+            hash_value ^= hashdb_xor_value
 
-        HashLookupTask(
-            bv=bv,
-            hashdb_api_url=hashdb_api_url,
-            hashdb_enum_name=hashdb_enum_name,
-            hashdb_algorithm=hashdb_algorithm,
-            hashdb_xor_value=hashdb_xor_value,
-            hash_value=hash_value,
-        ).start()
+            HashLookupTask(
+                bv=bv,
+                hashdb_api_url=hashdb_api_url,
+                hashdb_enum_name=hashdb_enum_name,
+                hashdb_algorithm=hashdb_algorithm,
+                hashdb_xor_value=hashdb_xor_value,
+                hash_value=hash_value,
+            ).start()
+        else:
+            logger.log_error(f"Could not look up hash: the selected token `{token.text}` does not look like a valid integer.")
+    else:
+        # No token available; try reading a selection from the context instead
+        br = BinaryReader(bv, bv.endianness)
+        selected_integer_bytes = br.read(length=context.length, address=context.address)
+        selected_integer_value: Optional[int] = None
+
+        if selected_integer_bytes is not None:
+            try:
+                # TODO: Handle 64-bit integers here
+                if br.endianness == Endianness.LittleEndian:
+                    selected_integer_value = struct.unpack(
+                        "<I", selected_integer_bytes
+                    )[0]
+                elif br.endianness == Endianness.BigEndian:
+                    selected_integer_value = struct.unpack(
+                        ">I", selected_integer_bytes
+                    )[0]
+            except struct.error as err:
+                logger.log_error(f"Could not interpret selection as an integer: {err}")
+
+        if selected_integer_value is not None:
+            logger.log_debug(f"Found value {selected_integer_value:#x}")
+            HashLookupTask(
+                bv=bv,
+                hashdb_api_url=hashdb_api_url,
+                hashdb_enum_name=hashdb_enum_name,
+                hashdb_algorithm=hashdb_algorithm,
+                hashdb_xor_value=hashdb_xor_value,
+                hash_value=selected_integer_value,
+            ).start()
 
 
 def change_hash_algorithm(context) -> None:
@@ -657,15 +691,37 @@ def hunt_algorithm(context: UIActionContext) -> None:
         "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
     )[0]
 
-    # Get selected hash
-    token = context.token.token
-    if token and token.type == InstructionTextTokenType.IntegerToken:
-        if token.text.startswith("-"):
-            # Handle negatives later
-            logger.log_warn("plugin does not currently handle negative values.")
-            return
-        hash_value = token.value
-        hash_value ^= hashdb_xor_value
-        HuntAlgorithmTask(bv, hashdb_api_url, hash_value).start()
+    if context.token.token:
+        token = context.token.token
+        if token.type == InstructionTextTokenType.IntegerToken:
+            if token.text.startswith("-"):
+                # Handle negatives later
+                logger.log_warn("plugin does not currently handle negative values.")
+                return
+            hash_value = token.value
+            hash_value ^= hashdb_xor_value
+            HuntAlgorithmTask(bv, hashdb_api_url, hash_value).start()
+        else:
+            logger.log_error(f"Could not look up hash: the selected token `{token.text}` does not look like a valid integer.")
     else:
-        logger.log_warn("This token does not look like a valid integer.")
+        # No token available; try reading a selection from the context instead
+        br = BinaryReader(bv, bv.endianness)
+        selected_integer_bytes = br.read(length=context.length, address=context.address)
+        selected_integer_value: Optional[int] = None
+
+        if selected_integer_bytes is not None:
+            try:
+                # TODO: Handle 64-bit integers here
+                if br.endianness == Endianness.LittleEndian:
+                    selected_integer_value = struct.unpack(
+                        "<I", selected_integer_bytes
+                    )[0]
+                elif br.endianness == Endianness.BigEndian:
+                    selected_integer_value = struct.unpack(
+                        ">I", selected_integer_bytes
+                    )[0]
+            except struct.error as err:
+                logger.log_error(f"Could not interpret selection as an integer: {err}")
+
+            if selected_integer_value is not None:
+                HuntAlgorithmTask(bv, hashdb_api_url, selected_integer_value).start()
