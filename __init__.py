@@ -156,7 +156,7 @@ def context_menu_creator(context):
 
 for action, target, add_to_menu in [
     ["HashDB\\Hash Lookup", actions.hash_lookup, False],
-    ["HashDB\\Multiple Hash Lookup", actions.multiple_hash_lookup, True],
+    ["HashDB\\Multiple Hash Lookup", actions.multiple_hash_lookup, False],
     ["HashDB\\Hunt", actions.hunt_algorithm, False],
     ["HashDB\\Select Hash Algorithm...", actions.select_hash_algorithm, True],
 ]:
