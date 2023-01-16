@@ -20,31 +20,6 @@ logger = Logger(session_id=0, logger_name=__name__)
 
 
 # --------------------------------------------------------------------------
-# Set xor key
-# --------------------------------------------------------------------------
-def set_xor_key(context: UIActionContext) -> bool:
-    """
-    Set xor key from selection
-    """
-    bv = context.binaryView
-    token = context.token.token
-    if token and token.type == InstructionTextTokenType.IntegerToken:
-        if token.text.startswith("-"):
-            # Handle negatives later
-            logger.log_warn("plugin does not currently handle negative values.")
-            return False
-        xor_value = token.value
-        Settings().set_integer(
-            "hashdb.xor_value", xor_value, SettingsScope.SettingsResourceScope
-        )
-        logger.log_info(f"XOR key set: {xor_value:#x}")
-        return True
-    else:
-        logger.log_info(f"failed to set XOR key.")
-        return False
-
-
-# --------------------------------------------------------------------------
 # Hash lookup
 # --------------------------------------------------------------------------
 class HashLookupTask(BackgroundTaskThread):
@@ -54,7 +29,6 @@ class HashLookupTask(BackgroundTaskThread):
         hashdb_api_url: str,
         hashdb_enum_name: str,
         hashdb_algorithm: str,
-        hashdb_xor_value: int,
         hash_value: int,
     ):
         super().__init__(
@@ -66,7 +40,6 @@ class HashLookupTask(BackgroundTaskThread):
         self.hashdb_api_url = hashdb_api_url
         self.hashdb_enum_name = hashdb_enum_name
         self.hashdb_algorithm = hashdb_algorithm
-        self.hashdb_xor_value = hashdb_xor_value
         self.hash_value = hash_value
 
     def run(self):
@@ -292,10 +265,6 @@ def hash_lookup(context: UIActionContext) -> None:
         logger.log_warn("Algorithm selection is required before looking up hashes.")
         return
 
-    hashdb_xor_value = Settings().get_integer_with_scope(
-        "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
-    )[0]
-
     if context.token.token:
         token = context.token.token
         if token.type == InstructionTextTokenType.IntegerToken:
@@ -304,18 +273,18 @@ def hash_lookup(context: UIActionContext) -> None:
                 logger.log_warn("plugin does not currently handle negative values.")
                 return
             hash_value = token.value
-            hash_value ^= hashdb_xor_value
 
             HashLookupTask(
                 bv=bv,
                 hashdb_api_url=hashdb_api_url,
                 hashdb_enum_name=hashdb_enum_name,
                 hashdb_algorithm=hashdb_algorithm,
-                hashdb_xor_value=hashdb_xor_value,
                 hash_value=hash_value,
             ).start()
         else:
-            logger.log_error(f"Could not look up hash: the selected token `{token.text}` does not look like a valid integer.")
+            logger.log_error(
+                f"Could not look up hash: the selected token `{token.text}` does not look like a valid integer."
+            )
     else:
         # No token available; try reading a selection from the context instead
         br = BinaryReader(bv, bv.endianness)
@@ -343,7 +312,6 @@ def hash_lookup(context: UIActionContext) -> None:
                 hashdb_api_url=hashdb_api_url,
                 hashdb_enum_name=hashdb_enum_name,
                 hashdb_algorithm=hashdb_algorithm,
-                hashdb_xor_value=hashdb_xor_value,
                 hash_value=selected_integer_value,
             ).start()
 
@@ -403,7 +371,6 @@ class MultipleHashLookupTask(BackgroundTaskThread):
         hashdb_api_url: str,
         hashdb_enum_name: str,
         hashdb_algorithm: str,
-        hashdb_xor_value: int,
         hash_values: List[int],
     ):
         super().__init__(
@@ -415,7 +382,6 @@ class MultipleHashLookupTask(BackgroundTaskThread):
         self.hashdb_api_url = hashdb_api_url
         self.hashdb_enum_name = hashdb_enum_name
         self.hashdb_algorithm = hashdb_algorithm
-        self.hashdb_xor_value = hashdb_xor_value
         self.hash_values = hash_values
 
     def run(self):
@@ -580,10 +546,6 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
         logger.log_warn("Algorithm selection is required before looking up hashes.")
         return
 
-    hashdb_xor_value = Settings().get_integer_with_scope(
-        "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
-    )[0]
-
     try:
         br = BinaryReader(bv, bv.endianness)
         br.seek(context.address)
@@ -612,7 +574,6 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
             hashdb_api_url=hashdb_api_url,
             hashdb_enum_name=hashdb_enum_name,
             hashdb_algorithm=hashdb_algorithm,
-            hashdb_xor_value=hashdb_xor_value,
             hash_values=selected_integer_values,
         ).start()
 
@@ -687,10 +648,6 @@ def hunt_algorithm(context: UIActionContext) -> None:
         logger.log_error("HashDB enum name not found.")
         return
 
-    hashdb_xor_value = Settings().get_integer_with_scope(
-        "hashdb.xor_value", bv, SettingsScope.SettingsResourceScope
-    )[0]
-
     if context.token.token:
         token = context.token.token
         if token.type == InstructionTextTokenType.IntegerToken:
@@ -699,10 +656,11 @@ def hunt_algorithm(context: UIActionContext) -> None:
                 logger.log_warn("plugin does not currently handle negative values.")
                 return
             hash_value = token.value
-            hash_value ^= hashdb_xor_value
             HuntAlgorithmTask(bv, hashdb_api_url, hash_value).start()
         else:
-            logger.log_error(f"Could not look up hash: the selected token `{token.text}` does not look like a valid integer.")
+            logger.log_error(
+                f"Could not look up hash: the selected token `{token.text}` does not look like a valid integer."
+            )
     else:
         # No token available; try reading a selection from the context instead
         br = BinaryReader(bv, bv.endianness)
@@ -724,4 +682,8 @@ def hunt_algorithm(context: UIActionContext) -> None:
                 logger.log_error(f"Could not interpret selection as an integer: {err}")
 
             if selected_integer_value is not None:
-                HuntAlgorithmTask(bv, hashdb_api_url, selected_integer_value).start()
+                HuntAlgorithmTask(
+                    bv=bv,
+                    hashdb_api_url=hashdb_api_url,
+                    hash_value=selected_integer_value,
+                ).start()

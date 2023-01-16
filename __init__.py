@@ -61,7 +61,7 @@ logger = Logger(session_id=0, logger_name=__name__)
 # they can be changed on the fly without having to reload the plugin ur
 # use a distinct settings system.
 #
-# The xor and alg setting will be serialized into each analysis
+# The algorithm setting will be serialized into each analysis
 # database's metadata, by always using the `SettingsResourceScope`
 # for those settings.
 
@@ -86,16 +86,6 @@ HASHDB_PLUGIN_SETTINGS: List[Tuple[str, dict]] = [
             "default": DEFAULT_ENUM_NAME,
             "description": "Name of enum used for HashDB strings",
             "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
-        },
-    ),
-    (
-        "hashdb.xor_value",
-        {
-            "title": "HashDB XOR Key",
-            "type": "number",
-            "default": 0,
-            "description": "XOR key to apply to hash values. This setting is specific to a particular analysis database.",
-            "ignore": ["SettingsUserScope", "SettingsProjectScope"],
         },
     ),
     (
@@ -165,7 +155,6 @@ def context_menu_creator(context):
 
 for action, target, add_to_menu in [
     ["HashDB\\Hash Lookup", actions.hash_lookup, False],
-    ["HashDB\\Set XOR Key...", actions.set_xor_key, False],
     ["HashDB\\Hunt", actions.hunt_algorithm, False],
     ["HashDB\\Multiple Hash Lookup", actions.multiple_hash_lookup, True],
     ["HashDB\\Reset Hash", actions.change_hash_algorithm, True],
