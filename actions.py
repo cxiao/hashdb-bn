@@ -316,49 +316,43 @@ def hash_lookup(context: UIActionContext) -> None:
             ).start()
 
 
-def change_hash_algorithm(context) -> None:
-    Settings().reset(
-        "hashdb.algorithm", context.binaryView, SettingsScope.SettingsResourceScope
-    )
-    select_hash_algorithm(context.binaryView)
-
-
 # --------------------------------------------------------------------------
 # Ask for a hash algorithm
 # --------------------------------------------------------------------------
-def select_hash_algorithm(bv: BinaryView) -> Optional[str]:
+def select_hash_algorithm(context: UIActionContext) -> None:
+    bv = context.binaryView
+
     hashdb_api_url = Settings().get_string("hashdb.url")
     if hashdb_api_url is None or hashdb_api_url == "":
         logger.log_error("HashDB API URL not found.")
         return
 
-    hashdb_algorithm = Settings().get_string_with_scope(
-        "hashdb.algorithm", bv, SettingsScope.SettingsResourceScope
+    try:
+        algorithms = api.get_algorithms(hashdb_api_url)
+    except api.HashDBError as api_error:
+        logger.log_error(f"HashDB API request failed: {api_error}")
+        return None
+
+    prompt_text_current_algorithm = Settings().get_string_with_scope(
+        "hashdb.algorithm", bv
     )[0]
+    if prompt_text_current_algorithm is None or prompt_text_current_algorithm == "":
+        prompt_text_current_algorithm = "None"
+    prompt_text = f"Select an algorithm from the list of known algorithms below.\nIf you are not sure which algorithm is correct, you can try selecting a value and hunting for a matching algorithm via the HashDB > Hunt action instead.\n\nThe currently set algorithm is `{prompt_text_current_algorithm}`."
 
-    if hashdb_algorithm is None or hashdb_algorithm == "":
-        try:
-            algorithms = api.get_algorithms(hashdb_api_url)
-        except api.HashDBError as api_error:
-            logger.log_error(f"HashDB API request failed: {api_error}")
-            return None
-
-        algorithm_choice = interaction.get_choice_input(
-            "Select an algorithm:", "[HashDB] Algorithm Selection", algorithms
+    algorithm_choice = interaction.get_choice_input(
+        title="[HashDB] Algorithm Selection",
+        prompt=prompt_text,
+        choices=algorithms,
+    )
+    if algorithm_choice is not None:
+        algorithm_name = algorithms[algorithm_choice].algorithm
+        Settings().set_string(
+            key="hashdb.algorithm",
+            value=algorithm_name,
+            view=bv,
+            scope=SettingsScope.SettingsResourceScope,
         )
-        if algorithm_choice is not None:
-            result = algorithms[algorithm_choice].algorithm
-            Settings().set_string(
-                key="hashdb.algorithm",
-                value=result,
-                view=bv,
-                scope=SettingsScope.SettingsResourceScope,
-            )
-            return result
-        else:
-            return None
-    else:
-        return hashdb_algorithm
 
 
 # --------------------------------------------------------------------------
