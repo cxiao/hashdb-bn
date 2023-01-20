@@ -20,6 +20,10 @@ The enum type can then be applied to variables in the database.
 
 ![](images/hash-created-enum-applied-function-arg-screenshot-border.png)
 
+If you are using Binary Ninja >= 3.3, you can also apply the resolved hash names using the new _Select Enum_ dialog (accessible by pressing the `M` key, or through _Display as_ > _Enum Member_ in the context menu).
+
+![](images/hash-enum-selection-dialog-screenshot-border.png)
+
 The name of the enum type created (by default `hashdb_strings`) can be changed in Binary Ninja's settings, under _HashDB > HashDB Enum Name_.
 
 ### Keyboard shortcuts
