@@ -26,6 +26,22 @@ If you are using Binary Ninja >= 3.3, you can also apply the resolved hash names
 
 The name of the enum type created (by default `hashdb_strings`) can be changed in Binary Ninja's settings, under _HashDB > HashDB Enum Name_.
 
+### Settings
+
+The settings for this plugin can be changed from Binary Ninja's Settings interface (_Edit > Preferences > Settings_). The settings list can be filtered to show only the HashDB plugin's settings by searching `HashDB` in the Settings search box.
+
+The following settings are applied globally:
+
+- HashDB API URL (`hashdb.url`). If you wish to use a different HashDB instance than the default OALabs HashDB, such as an internally hosted version, you can change this setting to point at your desired instance.
+- HashDB Enum Name (`hashdb.enum_name`)
+
+The following settings are specific to an individual binary. They are saved in the analysis database (`.bndb` file) for that binary, and will be restored the next time you open the analysis database.
+
+- HashDB Hash Algorithm (`hashdb.algorithm`)
+- HashDB Hash Algorithm Data Type (`hashdb.algorithm_type`)
+
+![](images/settings-screenshot-border.png)
+
 ### Keyboard shortcuts
 
 Keyboard shortcuts can be set for this plugin's commands from Binary Ninja's Keybindings interface (_Edit > Preferences > Keybindings_). The command list can be filtered to show only the HashDB plugin's commands by searching `HashDB` in the Keybindings search box.
