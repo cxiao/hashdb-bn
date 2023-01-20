@@ -21,6 +21,34 @@ class HashDBError(Exception):
 
 
 @dataclass
+class AlgorithmType:
+    """
+    Represents the data type and data size, in bytes, of the values produced by a specific hash algorithm.
+    """
+
+    name: str
+    size: int
+
+    @classmethod
+    def from_raw_name(cls, raw_name: str):
+        if raw_name == "unsigned_int":
+            return cls(
+                name="unsigned_int",
+                size=4,
+            )
+        elif raw_name == "unsigned_long":
+            return cls(
+                name="unsigned_long",
+                size=8,
+            )
+        else:
+            raise KeyError("Could not parse unknown algorithm type {raw_name}")
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.size} bytes)"
+
+
+@dataclass
 class Algorithm:
     """
     Represents the type `components/schemas/algorithm` in the HashDB OpenAPI specification.
@@ -29,14 +57,14 @@ class Algorithm:
 
     algorithm: str
     description: str
-    type: str
+    type: AlgorithmType
 
     @classmethod
     def from_dict(cls, src: Dict[str, Any]):
         result = cls(
             algorithm=src["algorithm"],
             description=src["description"],
-            type=src["type"],
+            type=AlgorithmType.from_raw_name(src["type"]),
         )
         return result
 

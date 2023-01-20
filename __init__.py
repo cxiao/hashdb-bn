@@ -98,6 +98,18 @@ HASHDB_PLUGIN_SETTINGS: List[Tuple[str, dict]] = [
             "ignore": ["SettingsUserScope", "SettingsProjectScope"],
         },
     ),
+    (
+        "hashdb.algorithm_type",
+        {
+            "title": "HashDB Hash Algorithm Data Type",
+            "type": "string",
+            "optional": True,
+            "enum": ["unsigned_int", "unsigned_long"],
+            "enumDescriptions": ["unsigned int (4 bytes)", "unsigned long (8 bytes)"],
+            "description": "Data type and data size of the hash algorithm used for the current binary. This setting is specific to a particular analysis database.",
+            "ignore": ["SettingsUserScope", "SettingsProjectScope"],
+        },
+    ),
 ]
 
 

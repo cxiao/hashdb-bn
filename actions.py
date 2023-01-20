@@ -1,4 +1,4 @@
-from typing import cast, Dict, List, Optional, Union
+from typing import cast, Dict, List, Optional, Union, Tuple
 from functools import partial
 import struct
 
@@ -29,6 +29,7 @@ class HashLookupTask(BackgroundTaskThread):
         hashdb_api_url: str,
         hashdb_enum_name: str,
         hashdb_algorithm: str,
+        hashdb_algorithm_data_width: int,
         hash_value: int,
     ):
         super().__init__(
@@ -40,6 +41,7 @@ class HashLookupTask(BackgroundTaskThread):
         self.hashdb_api_url = hashdb_api_url
         self.hashdb_enum_name = hashdb_enum_name
         self.hashdb_algorithm = hashdb_algorithm
+        self.hashdb_algorithm_data_width = hashdb_algorithm_data_width
         self.hash_value = hash_value
 
     def run(self):
@@ -96,11 +98,19 @@ class HashLookupTask(BackgroundTaskThread):
                     f"hash_lookup obtained module hash list: {module_hash_list}"
                 )
                 if module_hash_list is not None:
-                    self.add_enums(self.bv, self.hashdb_enum_name, module_hash_list)
+                    self.add_enums(
+                        bv=self.bv,
+                        enum_name=self.hashdb_enum_name,
+                        enum_width=self.hashdb_algorithm_data_width,
+                        hash_list=module_hash_list,
+                    )
                     self.bv.update_analysis_and_wait()
         else:  # Simple case, not an API which may be part of a module; just add a single hash to the enum
             self.add_enums(
-                self.bv, self.hashdb_enum_name, [api.Hash(self.hash_value, hash_string)]
+                bv=self.bv,
+                enum_name=self.hashdb_enum_name,
+                enum_width=self.hashdb_algorithm_data_width,
+                hash_list=[api.Hash(self.hash_value, hash_string)],
             )
             self.bv.update_analysis_and_wait()
         self.finish()
@@ -185,17 +195,17 @@ class HashLookupTask(BackgroundTaskThread):
             output_module_name[0] = None
 
     def add_enums(
-        self, bv: BinaryView, enum_name: str, hash_list: List[api.Hash]
+        self, bv: BinaryView, enum_name: str, enum_width: int, hash_list: List[api.Hash]
     ) -> None:
         existing_type = bv.types.get(enum_name)
         if existing_type is None:
             # Create a new enum
-            with EnumerationBuilder.builder(bv, QualifiedName(enum_name)) as new_enum:
-                new_enum = cast(EnumerationBuilder, new_enum)  # typing
-                for hash_ in hash_list:
-                    enum_value_name = hash_.hash_string.get_api_string_if_available()
-                    enum_value = hash_.value
-                    new_enum.append(enum_value_name, enum_value)
+            new_enum = EnumerationBuilder.create(width=enum_width)
+            for hash_ in hash_list:
+                enum_value_name = hash_.hash_string.get_api_string_if_available()
+                enum_value = hash_.value
+                new_enum.append(enum_value_name, enum_value)
+            bv.define_user_type(name=QualifiedName(enum_name), type_obj=new_enum)
         else:
             # Modify an existing enum
             if existing_type.type_class == TypeClass.EnumerationTypeClass:
@@ -265,6 +275,16 @@ def hash_lookup(context: UIActionContext) -> None:
         logger.log_warn("Algorithm selection is required before looking up hashes.")
         return
 
+    hashdb_algorithm_data_type = Settings().get_string_with_scope(
+        "hashdb.algorithm_type", bv
+    )[0]
+    if hashdb_algorithm_data_type is None or hashdb_algorithm_data_type == "":
+        logger.log_error("HashDB algorithm data type not found.")
+        return
+    hashdb_algorithm_data_type = api.AlgorithmType.from_raw_name(
+        hashdb_algorithm_data_type
+    )
+
     if context.token.token:
         token = context.token.token
         if token.type == InstructionTextTokenType.IntegerToken:
@@ -279,6 +299,7 @@ def hash_lookup(context: UIActionContext) -> None:
                 hashdb_api_url=hashdb_api_url,
                 hashdb_enum_name=hashdb_enum_name,
                 hashdb_algorithm=hashdb_algorithm,
+                hashdb_algorithm_data_width=hashdb_algorithm_data_type.size,
                 hash_value=hash_value,
             ).start()
         else:
@@ -292,18 +313,49 @@ def hash_lookup(context: UIActionContext) -> None:
         selected_integer_value: Optional[int] = None
 
         if selected_integer_bytes is not None:
-            try:
-                # TODO: Handle 64-bit integers here
-                if br.endianness == Endianness.LittleEndian:
-                    selected_integer_value = struct.unpack(
-                        "<I", selected_integer_bytes
-                    )[0]
-                elif br.endianness == Endianness.BigEndian:
-                    selected_integer_value = struct.unpack(
-                        ">I", selected_integer_bytes
-                    )[0]
-            except struct.error as err:
-                logger.log_error(f"Could not interpret selection as an integer: {err}")
+            if hashdb_algorithm_data_type.size == 4:
+                try:
+                    if br.endianness == Endianness.LittleEndian:
+                        selected_integer_value = struct.unpack(
+                            "<I", selected_integer_bytes
+                        )[0]
+                    elif br.endianness == Endianness.BigEndian:
+                        selected_integer_value = struct.unpack(
+                            ">I", selected_integer_bytes
+                        )[0]
+                except struct.error as err:
+                    logger.log_error(
+                        f"Could not interpret selection as a 32-bit integer: {err}"
+                    )
+            elif hashdb_algorithm_data_type.size == 8:
+                if len(selected_integer_bytes) == 4:
+                    try:
+                        if br.endianness == Endianness.LittleEndian:
+                            selected_integer_value = struct.unpack(
+                                "<I", selected_integer_bytes
+                            )[0]
+                        elif br.endianness == Endianness.BigEndian:
+                            selected_integer_value = struct.unpack(
+                                ">I", selected_integer_bytes
+                            )[0]
+                    except struct.error as err:
+                        logger.log_error(
+                            f"Could not interpret selection as a 32-bit integer: {err}"
+                        )
+                elif len(selected_integer_bytes) == 8:
+                    try:
+                        if br.endianness == Endianness.LittleEndian:
+                            selected_integer_value = struct.unpack(
+                                "<Q", selected_integer_bytes
+                            )[0]
+                        elif br.endianness == Endianness.BigEndian:
+                            selected_integer_value = struct.unpack(
+                                ">Q", selected_integer_bytes
+                            )[0]
+                    except struct.error as err:
+                        logger.log_error(
+                            f"Could not interpret selection as a 64-bit integer: {err}"
+                        )
 
         if selected_integer_value is not None:
             logger.log_debug(f"Found value {selected_integer_value:#x}")
@@ -312,6 +364,7 @@ def hash_lookup(context: UIActionContext) -> None:
                 hashdb_api_url=hashdb_api_url,
                 hashdb_enum_name=hashdb_enum_name,
                 hashdb_algorithm=hashdb_algorithm,
+                hashdb_algorithm_data_width=hashdb_algorithm_data_type.size,
                 hash_value=selected_integer_value,
             ).start()
 
@@ -347,9 +400,16 @@ def select_hash_algorithm(context: UIActionContext) -> None:
     )
     if algorithm_choice is not None:
         algorithm_name = algorithms[algorithm_choice].algorithm
+        algorithm_data_type = algorithms[algorithm_choice].type.name
         Settings().set_string(
             key="hashdb.algorithm",
             value=algorithm_name,
+            view=bv,
+            scope=SettingsScope.SettingsResourceScope,
+        )
+        Settings().set_string(
+            key="hashdb.algorithm_type",
+            value=algorithm_data_type,
             view=bv,
             scope=SettingsScope.SettingsResourceScope,
         )
@@ -365,6 +425,7 @@ class MultipleHashLookupTask(BackgroundTaskThread):
         hashdb_api_url: str,
         hashdb_enum_name: str,
         hashdb_algorithm: str,
+        hashdb_algorithm_data_width: int,
         hash_values: List[int],
     ):
         super().__init__(
@@ -376,6 +437,7 @@ class MultipleHashLookupTask(BackgroundTaskThread):
         self.hashdb_api_url = hashdb_api_url
         self.hashdb_enum_name = hashdb_enum_name
         self.hashdb_algorithm = hashdb_algorithm
+        self.hashdb_algorithm_data_width = hashdb_algorithm_data_width
         self.hash_values = hash_values
 
     def run(self):
@@ -394,7 +456,12 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                     self.finish()
                     return
                 if len(collected_hash_value) == 1:
-                    self.add_enums(self.bv, self.hashdb_enum_name, collected_hash_value)
+                    self.add_enums(
+                        bv=self.bv,
+                        enum_name=self.hashdb_enum_name,
+                        enum_width=self.hashdb_algorithm_data_width,
+                        hash_list=collected_hash_value,
+                    )
                     self.bv.update_analysis_and_wait()
                 else:
                     output_user_choose_hash_from_collisions: List[
@@ -410,9 +477,12 @@ class MultipleHashLookupTask(BackgroundTaskThread):
 
                     if hash_string is not None:
                         self.add_enums(
-                            self.bv,
-                            self.hashdb_enum_name,
-                            [api.Hash(collected_hash_value[0].value, hash_string)],
+                            bv=self.bv,
+                            enum_name=self.hashdb_enum_name,
+                            enum_width=self.hashdb_algorithm_data_width,
+                            hash_list=[
+                                api.Hash(collected_hash_value[0].value, hash_string)
+                            ],
                         )
                         self.bv.update_analysis_and_wait()
 
@@ -446,17 +516,17 @@ class MultipleHashLookupTask(BackgroundTaskThread):
         output_hash_string[0] = collisions[choice]
 
     def add_enums(
-        self, bv: BinaryView, enum_name: str, hash_list: List[api.Hash]
+        self, bv: BinaryView, enum_name: str, enum_width: int, hash_list: List[api.Hash]
     ) -> None:
         existing_type = bv.types.get(enum_name)
         if existing_type is None:
             # Create a new enum
-            with EnumerationBuilder.builder(bv, QualifiedName(enum_name)) as new_enum:
-                new_enum = cast(EnumerationBuilder, new_enum)  # typing
-                for hash_ in hash_list:
-                    enum_value_name = hash_.hash_string.get_api_string_if_available()
-                    enum_value = hash_.value
-                    new_enum.append(enum_value_name, enum_value)
+            new_enum = EnumerationBuilder.create(width=enum_width)
+            for hash_ in hash_list:
+                enum_value_name = hash_.hash_string.get_api_string_if_available()
+                enum_value = hash_.value
+                new_enum.append(enum_value_name, enum_value)
+            bv.define_user_type(name=QualifiedName(enum_name), type_obj=new_enum)
         else:
             # Modify an existing enum
             if existing_type.type_class == TypeClass.EnumerationTypeClass:
@@ -540,6 +610,16 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
         logger.log_warn("Algorithm selection is required before looking up hashes.")
         return
 
+    hashdb_algorithm_data_type = Settings().get_string_with_scope(
+        "hashdb.algorithm_type", bv
+    )[0]
+    if hashdb_algorithm_data_type is None or hashdb_algorithm_data_type == "":
+        logger.log_error("HashDB algorithm data type not found.")
+        return
+    hashdb_algorithm_data_type = api.AlgorithmType.from_raw_name(
+        hashdb_algorithm_data_type
+    )
+
     try:
         br = BinaryReader(bv, bv.endianness)
         br.seek(context.address)
@@ -547,18 +627,23 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
         selected_integer_values = []
         selected_address_range_end = br.offset
         while br.offset < (context.address + context.length):
-            selected_integer_value = br.read32()
+            selected_integer_value = None
+            if hashdb_algorithm_data_type.size == 4:
+                selected_integer_value = br.read32()
+            elif hashdb_algorithm_data_type.size == 8:
+                selected_integer_value = br.read64()
+
             if selected_integer_value is not None:
                 selected_integer_values.append(selected_integer_value)
                 selected_address_range_end = br.offset
             else:
                 logger.log_warn(
-                    f"Could not read value at address {br.offset:#x} as 32-bit integer; only submitting hashes read up to this address for analysis."
+                    f"Could not read value at address {br.offset:#x} as {hashdb_algorithm_data_type.size}-byte integer; only submitting hashes read up to this address for analysis."
                 )
                 break
 
         logger.log_info(
-            f"Found {len(selected_integer_values)} 32-bit integer values which are potential hashes, from address {context.address:#x} to {selected_address_range_end:#x}. Submitting values..."
+            f"Found {len(selected_integer_values)} integer values which are potential hashes, from address {context.address:#x} to {selected_address_range_end:#x}. Submitting values..."
         )
         for selected_integer_value in selected_integer_values:
             logger.log_debug(f"Found value {selected_integer_value:#x}")
@@ -568,6 +653,7 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
             hashdb_api_url=hashdb_api_url,
             hashdb_enum_name=hashdb_enum_name,
             hashdb_algorithm=hashdb_algorithm,
+            hashdb_algorithm_data_width=hashdb_algorithm_data_type.size,
             hash_values=selected_integer_values,
         ).start()
 
@@ -589,18 +675,37 @@ class HuntAlgorithmTask(BackgroundTaskThread):
         self.hash_value = hash_value
 
     def run(self):
-        match_results = self.call_api(self.hashdb_api_url, self.hash_value)
+        match_results = self.call_hunt_api(self.hashdb_api_url, self.hash_value)
         if match_results is None or len(match_results) == 0:
             interaction.show_message_box(
                 "[HashDB] No Match", "No algorithms matched the hash."
             )
         else:
-            user_choose_match_fn = partial(self.user_choose_match, match_results)
-            execute_on_main_thread(user_choose_match_fn)
+            # The hunt API endpoint doesn't actually return any algorithm descriptions
+            # or sizes, only their names; we must make another API request here to
+            # get the remaining information.
+            algorithm_list = self.call_algorithms_api(self.hashdb_api_url)
+            if algorithm_list is not None:
+                algorithm_dict = {
+                    algorithm.algorithm: algorithm for algorithm in algorithm_list
+                }
+                match_results_with_algorithm_descriptions: List[
+                    Tuple[api.HuntMatch, api.Algorithm]
+                ] = [
+                    (match_result, algorithm_dict[match_result.algorithm])
+                    for match_result in match_results
+                ]
+
+                user_choose_match_fn = partial(
+                    self.user_choose_match, match_results_with_algorithm_descriptions
+                )
+                execute_on_main_thread(user_choose_match_fn)
+            else:
+                logger.log_error("Could not retrieve a list of algorithm descriptions")
         self.finish()
         return
 
-    def call_api(
+    def call_hunt_api(
         self, hashdb_api_url: str, hash_value: int
     ) -> Optional[List[api.HuntMatch]]:
         try:
@@ -613,15 +718,38 @@ class HuntAlgorithmTask(BackgroundTaskThread):
             logger.log_error(f"HashDB API request failed: {api_error}")
             return None
 
-    def user_choose_match(self, match_results: List[api.HuntMatch]) -> None:
+    def call_algorithms_api(self, hashdb_api_url: str) -> Optional[List[api.Algorithm]]:
+        try:
+            algorithms = api.get_algorithms(hashdb_api_url)
+            return algorithms
+        except api.HashDBError as api_error:
+            logger.log_error(f"HashDB API request failed: {api_error}")
+            return None
+
+    def user_choose_match(
+        self,
+        match_results: List[Tuple[api.HuntMatch, api.Algorithm]],
+    ) -> None:
+        displayed_match_results = [
+            f"{hunt_match} | {algorithm}" for (hunt_match, algorithm) in match_results
+        ]
         msg = """The following algorithms contain a matching hash.\n\nSelect an algorithm to set as the default for this binary."""
         choice_idx = interaction.get_choice_input(
-            msg, "[HashDB] Algorithm Selection", match_results
+            msg, "[HashDB] Algorithm Selection", displayed_match_results
         )
         if choice_idx is not None:
+            (_hunt_match, chosen_algorithm) = match_results[choice_idx]
+            algorithm_name = chosen_algorithm.algorithm
+            algorithm_data_type = chosen_algorithm.type.name
             Settings().set_string(
                 key="hashdb.algorithm",
-                value=match_results[choice_idx].algorithm,
+                value=algorithm_name,
+                view=self.bv,
+                scope=SettingsScope.SettingsResourceScope,
+            )
+            Settings().set_string(
+                key="hashdb.algorithm_type",
+                value=algorithm_data_type,
                 view=self.bv,
                 scope=SettingsScope.SettingsResourceScope,
             )
@@ -662,18 +790,34 @@ def hunt_algorithm(context: UIActionContext) -> None:
         selected_integer_value: Optional[int] = None
 
         if selected_integer_bytes is not None:
-            try:
-                # TODO: Handle 64-bit integers here
-                if br.endianness == Endianness.LittleEndian:
-                    selected_integer_value = struct.unpack(
-                        "<I", selected_integer_bytes
-                    )[0]
-                elif br.endianness == Endianness.BigEndian:
-                    selected_integer_value = struct.unpack(
-                        ">I", selected_integer_bytes
-                    )[0]
-            except struct.error as err:
-                logger.log_error(f"Could not interpret selection as an integer: {err}")
+            if len(selected_integer_bytes) == 4:
+                try:
+                    if br.endianness == Endianness.LittleEndian:
+                        selected_integer_value = struct.unpack(
+                            "<I", selected_integer_bytes
+                        )[0]
+                    elif br.endianness == Endianness.BigEndian:
+                        selected_integer_value = struct.unpack(
+                            ">I", selected_integer_bytes
+                        )[0]
+                except struct.error as err:
+                    logger.log_error(
+                        f"Could not interpret selection as a 32-bit integer: {err}"
+                    )
+            elif len(selected_integer_bytes) == 8:
+                try:
+                    if br.endianness == Endianness.LittleEndian:
+                        selected_integer_value = struct.unpack(
+                            "<Q", selected_integer_bytes
+                        )[0]
+                    elif br.endianness == Endianness.BigEndian:
+                        selected_integer_value = struct.unpack(
+                            ">Q", selected_integer_bytes
+                        )[0]
+                except struct.error as err:
+                    logger.log_error(
+                        f"Could not interpret selection as a 64-bit integer: {err}"
+                    )
 
             if selected_integer_value is not None:
                 HuntAlgorithmTask(
