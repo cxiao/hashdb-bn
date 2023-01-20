@@ -731,7 +731,8 @@ class HuntAlgorithmTask(BackgroundTaskThread):
         match_results: List[Tuple[api.HuntMatch, api.Algorithm]],
     ) -> None:
         displayed_match_results = [
-            f"{hunt_match} | {algorithm}" for (hunt_match, algorithm) in match_results
+            f"Count {hunt_match.count}, Hit rate {hunt_match.hitrate:.1%}: {algorithm}"
+            for (hunt_match, algorithm) in match_results
         ]
         msg = """The following algorithms contain a matching hash.\n\nSelect an algorithm to set as the default for this binary."""
         choice_idx = interaction.get_choice_input(

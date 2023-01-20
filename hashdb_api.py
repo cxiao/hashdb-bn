@@ -69,7 +69,7 @@ class Algorithm:
         return result
 
     def __str__(self) -> str:
-        return f"{self.algorithm} ({self.type}): {self.description}"
+        return f"{self.algorithm} [{self.type}]: {self.description}"
 
 
 @dataclass
