@@ -8,6 +8,14 @@
 
 ## Usage
 
+### Hunting for the correct hash algorithm (`HashDB - Hunt`)
+
+The `HashDB - Hunt` command attempts to identify the hash algorithm which was used to generate a particular hash value.
+
+![](images/hash-hunt-multiple-options-screenshot-border.png)
+
+It is the user's responsibility to ensure that the identified hash algorithm is correct! The list of all hash algorithms known to the OALabs HashDB lookup service is maintained at the [OALabs/hashdb repository, under the `algorithms` directory](https://github.com/OALabs/hashdb/tree/main/algorithms); a Python implementation of each hash algorithm is inside each listed file, and can be checked against the implementation of the API hashing function in the binary being analyzed.
+
 ### Viewing and applying found hashes
 
 Found hashes are added as enum entries under the `hashdb_strings` enum type, and can be viewed in the _Types_ menu. The resolved hash string is set as the name of the enum entry.
