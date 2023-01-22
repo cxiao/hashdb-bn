@@ -68,6 +68,8 @@ This plugin can be installed via either:
         - Running the _Install python3 module..._ command (via the Command Palette), and pasting the contents of [`requirements.txt`](requirements.txt) in this repository into the dialog window.
         - Running `pip install -r requirements.txt` in the Python environment used by Binary Ninja.
 
+This plugin requires Python >= 3.7, and Binary Ninja version >= 2.4.2846.
+
 ## License
 
 This plugin is released under a 3-Clause BSD license.
