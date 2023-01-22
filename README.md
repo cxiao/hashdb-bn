@@ -1,16 +1,20 @@
-# Binary Ninja HashDB Plugin
+# #️⃣ Binary Ninja HashDB Plugin
 
-[HashDB](https://github.com/OALabs/hashdb) is a community-sourced library of hashing algorithms used in malware. This plugin queries the [OALabs HashDB Lookup Service](https://hashdb.openanalysis.net/) for hash values which appear in the currently analyzed file, fetches a list of strings which match those hashes, and collects the string values into a type definition (e.g. an enum). The defined type can then be applied to the binary for further analysis.
+[HashDB](https://github.com/OALabs/hashdb) is a community-sourced library of hashing algorithms used in malware. This plugin queries the [OALabs HashDB Lookup Service](https://hashdb.openanalysis.net/) for hash values which appear in the currently analyzed file, fetches a list of strings which match those hashes, and collects the string values into an enum type definition. The defined enum type can then be applied to the binary for further analysis.
+
+## Usage
+
+### Looking up a hash (_HashDB - Hash Lookup_)
+
+The _HashDB - Hash Lookup_ command looks up the hash value highlighted by the cursor.
 
 ![](images/hashlookup-screenshot-border.png)
 
 ![](images/hashlookup-result-screenshot-border.png)
 
-## Usage
+### Hunting for the correct hash algorithm (_HashDB - Hunt_)
 
-### Hunting for the correct hash algorithm (`HashDB - Hunt`)
-
-The `HashDB - Hunt` command attempts to identify the hash algorithm which was used to generate a particular hash value.
+The _HashDB - Hunt_ command attempts to identify the hash algorithm which was used to generate a particular hash value. The identified algorithm is set as the default algorithm for future hash lookups in this binary, in the _HashDB > HashDB Hash Algorithm_ setting.
 
 ![](images/hash-hunt-multiple-options-screenshot-border.png)
 
@@ -18,9 +22,7 @@ It is the user's responsibility to ensure that the identified hash algorithm is 
 
 ### Viewing and applying found hashes
 
-Found hashes are added as enum entries under the `hashdb_strings` enum type, and can be viewed in the _Types_ menu. The resolved hash string is set as the name of the enum entry.
-
-All newly found hashes are appended as enum entries to this type.
+Found hashes are added as enum entries under a new enum type named `hashdb_strings_{NAME_OF_ALGORITHM}`. The names and values of the found hashes can be viewed in the _Types_ menu.
 
 ![](images/hash-created-enum-screenshot-border.png)
 
@@ -32,7 +34,8 @@ If you are using Binary Ninja >= 3.3, you can also apply the resolved hash names
 
 ![](images/hash-enum-selection-dialog-screenshot-border.png)
 
-The name of the enum type created (by default `hashdb_strings`) can be changed in Binary Ninja's settings, under _HashDB > HashDB Enum Name_.
+The name prefix used in the enum type (by default `hashdb_strings`) can be changed in Binary Ninja's settings, under _HashDB > HashDB Enum Name_.
+
 
 ### Settings
 
@@ -40,13 +43,13 @@ The settings for this plugin can be changed from Binary Ninja's Settings interfa
 
 The following settings are applied globally:
 
-- HashDB API URL (`hashdb.url`). If you wish to use a different HashDB instance than the default OALabs HashDB, such as an internally hosted version, you can change this setting to point at your desired instance.
-- HashDB Enum Name (`hashdb.enum_name`)
+- _HashDB API URL_ (`hashdb.url`). If you wish to use a different HashDB instance than the default OALabs HashDB, such as an internally hosted version, you can change this setting to point at your desired instance.
+- _HashDB Enum Name_ (`hashdb.enum_name`)
 
 The following settings are specific to an individual binary. They are saved in the analysis database (`.bndb` file) for that binary, and will be restored the next time you open the analysis database.
 
-- HashDB Hash Algorithm (`hashdb.algorithm`)
-- HashDB Hash Algorithm Data Type (`hashdb.algorithm_type`)
+- _HashDB Hash Algorithm_ (`hashdb.algorithm`)
+- _HashDB Hash Algorithm Data Type_ (`hashdb.algorithm_type`)
 
 ![](images/settings-screenshot-border.png)
 
