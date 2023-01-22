@@ -222,10 +222,11 @@ class HashLookupTask(BackgroundTaskThread):
                 hash_candidate.hash_string.get_api_string_if_available()
             ] = hash_candidate.hash_string
 
+        hash_value_for_user_choice_box = hash_candidates[0].value
         choice_idx = interaction.get_choice_input(
-            "Select the best match: ",
-            "[HashDB] String Selection",
-            list(collisions.keys()),
+            title="[HashDB] String Selection",
+            prompt=f"Select the best match for the hash value {hash_value_for_user_choice_box:#x}",
+            choices=list(collisions.keys()),
         )
         if choice_idx is not None:
             choice = list(collisions.keys())[choice_idx]
@@ -511,10 +512,11 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                 hash_candidate.hash_string.get_api_string_if_available()
             ] = hash_candidate.hash_string
 
+        hash_value_for_user_choice_box = hash_candidates[0].value
         choice_idx = interaction.get_choice_input(
-            "Select the best match: ",
-            "[HashDB] String Selection",
-            list(collisions.keys()),
+            title="[HashDB] String Selection",
+            prompt=f"Select the best match for the hash value {hash_value_for_user_choice_box:#x}",
+            choices=list(collisions.keys()),
         )
         if choice_idx is not None:
             choice = list(collisions.keys())[choice_idx]
