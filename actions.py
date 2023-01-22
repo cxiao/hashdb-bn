@@ -126,8 +126,15 @@ class HashLookupTask(BackgroundTaskThread):
                 output_hash_string=output_user_choose_hash_from_collisions,
             )
             execute_on_main_thread_and_wait(user_choose_hash_from_collisions_fn)
-            hash_string = output_user_choose_hash_from_collisions[0]
-            self.progress = ""
+            if output_user_choose_hash_from_collisions[0] is not None:
+                hash_string = output_user_choose_hash_from_collisions[0]
+                self.progress = ""
+            else:
+                logger.log_warn(
+                    f"Hash collisions were found for value {self.hash_value:#x}, but no hash was chosen"
+                )
+                self.finish()
+                return
 
         if hash_string.is_api and hash_string.modules is not None:
             self.progress = f"[HashDB] Hash found is an API string which is part of a module; choose whether to import the module..."
