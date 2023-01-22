@@ -19,6 +19,60 @@ from . import hashdb_api as api
 logger = Logger(session_id=0, logger_name=__name__)
 
 
+def add_enums(
+    bv: BinaryView, enum_name: str, enum_width: int, hash_list: List[api.Hash]
+) -> None:
+    existing_type = bv.types.get(enum_name)
+    if existing_type is None:
+        # Create a new enum
+        new_enum = EnumerationBuilder.create(width=enum_width)
+        for hash_ in hash_list:
+            enum_value_name = hash_.hash_string.get_api_string_if_available()
+            enum_value = hash_.value
+            new_enum.append(enum_value_name, enum_value)
+        bv.define_user_type(name=QualifiedName(enum_name), type_obj=new_enum)
+    else:
+        # Modify an existing enum
+        if existing_type.type_class == TypeClass.EnumerationTypeClass:
+            with Type.builder(bv, QualifiedName(enum_name)) as existing_enum:
+                existing_enum = cast(EnumerationBuilder, existing_enum)  # typing
+                # In Binary Ninja, enumeration members are not guaranteed to be unique.
+                # It is possible to have 2 different enum members
+                # with exactly the same name and the same value.
+                # Therefore, we must take care to _replace_ any existing enum member
+                # with the same name as the enum member we would like to add,
+                # rather than _appending_ a duplicate member with the same name.
+
+                # Create a list of member names to use for lookup.
+                # EnumerationBuilder.replace requires a member index as an argument,
+                # so we must save the original member index as well.
+                member_dict = {
+                    member.name: idx
+                    for (idx, member) in enumerate(existing_enum.members)
+                }
+
+                for hash_ in hash_list:
+                    enum_value_name = hash_.hash_string.get_api_string_if_available()
+                    enum_value = hash_.value
+                    enum_member_idx = member_dict.get(enum_value_name)
+                    if enum_member_idx is not None:
+                        existing_enum.replace(
+                            enum_member_idx,  # original member idx
+                            enum_value_name,  # new name
+                            enum_value,  # new value
+                        )
+                    else:
+                        # Enum member with this name doesn't yet exist
+                        existing_enum.append(
+                            enum_value_name,  # new name
+                            enum_value,  # new value
+                        )
+        else:
+            logger.log_error(
+                f"Enum values could not be added; a non-enum type with the name {enum_name} already exists."
+            )
+
+
 # --------------------------------------------------------------------------
 # Hash lookup
 # --------------------------------------------------------------------------
@@ -98,7 +152,7 @@ class HashLookupTask(BackgroundTaskThread):
                     f"hash_lookup obtained module hash list: {module_hash_list}"
                 )
                 if module_hash_list is not None:
-                    self.add_enums(
+                    add_enums(
                         bv=self.bv,
                         enum_name=self.hashdb_enum_name,
                         enum_width=self.hashdb_algorithm_data_width,
@@ -106,7 +160,7 @@ class HashLookupTask(BackgroundTaskThread):
                     )
                     self.bv.update_analysis_and_wait()
 
-        self.add_enums(
+        add_enums(
             bv=self.bv,
             enum_name=self.hashdb_enum_name,
             enum_width=self.hashdb_algorithm_data_width,
@@ -193,61 +247,6 @@ class HashLookupTask(BackgroundTaskThread):
             output_module_name[0] = module_name
         else:
             output_module_name[0] = None
-
-    def add_enums(
-        self, bv: BinaryView, enum_name: str, enum_width: int, hash_list: List[api.Hash]
-    ) -> None:
-        existing_type = bv.types.get(enum_name)
-        if existing_type is None:
-            # Create a new enum
-            new_enum = EnumerationBuilder.create(width=enum_width)
-            for hash_ in hash_list:
-                enum_value_name = hash_.hash_string.get_api_string_if_available()
-                enum_value = hash_.value
-                new_enum.append(enum_value_name, enum_value)
-            bv.define_user_type(name=QualifiedName(enum_name), type_obj=new_enum)
-        else:
-            # Modify an existing enum
-            if existing_type.type_class == TypeClass.EnumerationTypeClass:
-                with Type.builder(bv, QualifiedName(enum_name)) as existing_enum:
-                    existing_enum = cast(EnumerationBuilder, existing_enum)  # typing
-                    # In Binary Ninja, enumeration members are not guaranteed to be unique.
-                    # It is possible to have 2 different enum members
-                    # with exactly the same name and the same value.
-                    # Therefore, we must take care to _replace_ any existing enum member
-                    # with the same name as the enum member we would like to add,
-                    # rather than _appending_ a duplicate member with the same name.
-
-                    # Create a list of member names to use for lookup.
-                    # EnumerationBuilder.replace requires a member index as an argument,
-                    # so we must save the original member index as well.
-                    member_dict = {
-                        member.name: idx
-                        for (idx, member) in enumerate(existing_enum.members)
-                    }
-
-                    for hash_ in hash_list:
-                        enum_value_name = (
-                            hash_.hash_string.get_api_string_if_available()
-                        )
-                        enum_value = hash_.value
-                        enum_member_idx = member_dict.get(enum_value_name)
-                        if enum_member_idx is not None:
-                            existing_enum.replace(
-                                enum_member_idx,  # original member idx
-                                enum_value_name,  # new name
-                                enum_value,  # new value
-                            )
-                        else:
-                            # Enum member with this name doesn't yet exist
-                            existing_enum.append(
-                                enum_value_name,  # new name
-                                enum_value,  # new value
-                            )
-            else:
-                logger.log_error(
-                    f"Enum values could not be added; a non-enum type with the name {enum_name} already exists."
-                )
 
 
 def hash_lookup(context: UIActionContext) -> None:
@@ -456,7 +455,7 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                     self.finish()
                     return
                 if len(collected_hash_value) == 1:
-                    self.add_enums(
+                    add_enums(
                         bv=self.bv,
                         enum_name=self.hashdb_enum_name,
                         enum_width=self.hashdb_algorithm_data_width,
@@ -476,7 +475,7 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                     hash_string = output_user_choose_hash_from_collisions[0]
 
                     if hash_string is not None:
-                        self.add_enums(
+                        add_enums(
                             bv=self.bv,
                             enum_name=self.hashdb_enum_name,
                             enum_width=self.hashdb_algorithm_data_width,
@@ -514,61 +513,6 @@ class MultipleHashLookupTask(BackgroundTaskThread):
             choice = list(collisions.keys())[0]
 
         output_hash_string[0] = collisions[choice]
-
-    def add_enums(
-        self, bv: BinaryView, enum_name: str, enum_width: int, hash_list: List[api.Hash]
-    ) -> None:
-        existing_type = bv.types.get(enum_name)
-        if existing_type is None:
-            # Create a new enum
-            new_enum = EnumerationBuilder.create(width=enum_width)
-            for hash_ in hash_list:
-                enum_value_name = hash_.hash_string.get_api_string_if_available()
-                enum_value = hash_.value
-                new_enum.append(enum_value_name, enum_value)
-            bv.define_user_type(name=QualifiedName(enum_name), type_obj=new_enum)
-        else:
-            # Modify an existing enum
-            if existing_type.type_class == TypeClass.EnumerationTypeClass:
-                with Type.builder(bv, QualifiedName(enum_name)) as existing_enum:
-                    existing_enum = cast(EnumerationBuilder, existing_enum)  # typing
-                    # In Binary Ninja, enumeration members are not guaranteed to be unique.
-                    # It is possible to have 2 different enum members
-                    # with exactly the same name and the same value.
-                    # Therefore, we must take care to _replace_ any existing enum member
-                    # with the same name as the enum member we would like to add,
-                    # rather than _appending_ a duplicate member with the same name.
-
-                    # Create a list of member names to use for lookup.
-                    # EnumerationBuilder.replace requires a member index as an argument,
-                    # so we must save the original member index as well.
-                    member_dict = {
-                        member.name: idx
-                        for (idx, member) in enumerate(existing_enum.members)
-                    }
-
-                    for hash_ in hash_list:
-                        enum_value_name = (
-                            hash_.hash_string.get_api_string_if_available()
-                        )
-                        enum_value = hash_.value
-                        enum_member_idx = member_dict.get(enum_value_name)
-                        if enum_member_idx is not None:
-                            existing_enum.replace(
-                                enum_member_idx,  # original member idx
-                                enum_value_name,  # new name
-                                enum_value,  # new value
-                            )
-                        else:
-                            # Enum member with this name doesn't yet exist
-                            existing_enum.append(
-                                enum_value_name,  # new name
-                                enum_value,  # new value
-                            )
-            else:
-                logger.log_error(
-                    f"Enum values could not be added; a non-enum type with the name {enum_name} already exists."
-                )
 
     def call_api_get_strings_from_hash(
         self, hashdb_api_url: str, hashdb_algorithm: str, hash_value: int
