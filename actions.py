@@ -105,14 +105,14 @@ class HashLookupTask(BackgroundTaskThread):
                         hash_list=module_hash_list,
                     )
                     self.bv.update_analysis_and_wait()
-        else:  # Simple case, not an API which may be part of a module; just add a single hash to the enum
-            self.add_enums(
-                bv=self.bv,
-                enum_name=self.hashdb_enum_name,
-                enum_width=self.hashdb_algorithm_data_width,
-                hash_list=[api.Hash(self.hash_value, hash_string)],
-            )
-            self.bv.update_analysis_and_wait()
+
+        self.add_enums(
+            bv=self.bv,
+            enum_name=self.hashdb_enum_name,
+            enum_width=self.hashdb_algorithm_data_width,
+            hash_list=[api.Hash(self.hash_value, hash_string)],
+        )
+        self.bv.update_analysis_and_wait()
         self.finish()
         return
 
@@ -183,9 +183,9 @@ class HashLookupTask(BackgroundTaskThread):
     ):
         modules.sort()
         choice_idx = interaction.get_choice_input(
-            f"The hash for {resolved_string_value} is a module function.\n\nDo you want to import all function hashes from this module?",
-            "[HashDB] Bulk Import",
-            modules,
+            title="[HashDB] Bulk Import",
+            prompt=f"The hash for {resolved_string_value} is a module function.\n\nDo you want to import all function hashes from this module?",
+            choices=modules,
         )
         if choice_idx is not None:
             module_name = modules[choice_idx]
