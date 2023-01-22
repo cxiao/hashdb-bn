@@ -36,6 +36,15 @@ If you are using Binary Ninja >= 3.3, you can also apply the resolved hash names
 
 The name prefix used in the enum type (by default `hashdb_strings`) can be changed in Binary Ninja's settings, under _HashDB > HashDB Enum Name_.
 
+### Looking up multiple hashes (_HashDB - Multiple Hash Lookup_)
+
+Multiple hashes can be selected and looked up at once using the _HashDB - Multiple Hash Lookup_ command.
+
+![](images/multiple-hash-lookup-screenshot-border.png)
+
+The resolved hashes can then be applied by setting the selected variables to the created enum type.
+
+![](images/multiple-hash-lookup-enum-type-applied-screenshot-border.png)
 
 ### Settings
 
