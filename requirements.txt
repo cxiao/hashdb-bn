@@ -1,2 +1,1 @@
--i https://pypi.org/simple
 httpx>=0.23.0
