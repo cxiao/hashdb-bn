@@ -73,6 +73,10 @@ def add_enums(
             )
 
 
+def construct_enum_name(hashdb_enum_name: str, algorithm_name: str) -> str:
+    return f"{hashdb_enum_name}_{algorithm_name}"
+
+
 # --------------------------------------------------------------------------
 # Hash lookup
 # --------------------------------------------------------------------------
@@ -154,7 +158,9 @@ class HashLookupTask(BackgroundTaskThread):
                 if module_hash_list is not None:
                     add_enums(
                         bv=self.bv,
-                        enum_name=self.hashdb_enum_name,
+                        enum_name=construct_enum_name(
+                            self.hashdb_enum_name, self.hashdb_algorithm
+                        ),
                         enum_width=self.hashdb_algorithm_data_width,
                         hash_list=module_hash_list,
                     )
@@ -162,7 +168,7 @@ class HashLookupTask(BackgroundTaskThread):
 
         add_enums(
             bv=self.bv,
-            enum_name=self.hashdb_enum_name,
+            enum_name=construct_enum_name(self.hashdb_enum_name, self.hashdb_algorithm),
             enum_width=self.hashdb_algorithm_data_width,
             hash_list=[api.Hash(self.hash_value, hash_string)],
         )
@@ -457,7 +463,9 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                 if len(collected_hash_value) == 1:
                     add_enums(
                         bv=self.bv,
-                        enum_name=self.hashdb_enum_name,
+                        enum_name=construct_enum_name(
+                            self.hashdb_enum_name, self.hashdb_algorithm
+                        ),
                         enum_width=self.hashdb_algorithm_data_width,
                         hash_list=collected_hash_value,
                     )
@@ -477,7 +485,9 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                     if hash_string is not None:
                         add_enums(
                             bv=self.bv,
-                            enum_name=self.hashdb_enum_name,
+                            enum_name=construct_enum_name(
+                                self.hashdb_enum_name, self.hashdb_algorithm
+                            ),
                             enum_width=self.hashdb_algorithm_data_width,
                             hash_list=[
                                 api.Hash(collected_hash_value[0].value, hash_string)
