@@ -20,14 +20,11 @@
         "Windows"
     ],
     "installinstructions": {
-        "Darwin": "no special instructions, package manager is recommended",
-        "Linux": "no special instructions, package manager is recommended",
-        "Windows": "no special instructions, package manager is recommended"
+        "Darwin": "Installation via the Binary Ninja plugin manager is recommended. For alternative installation instructions, see the [Installation section in the README on the GitHub repository for this plugin](https://github.com/cxiao/hashdb_bn#installation).",
+        "Linux": "Installation via the Binary Ninja plugin manager is recommended. For alternative installation instructions, see the [Installation section in the README on the GitHub repository for this plugin](https://github.com/cxiao/hashdb_bn#installation).",
+        "Windows": "Installation via the Binary Ninja plugin manager is recommended. For alternative installation instructions, see the [Installation section in the README on the GitHub repository for this plugin](https://github.com/cxiao/hashdb_bn#installation)."
     },
-    "dependencies": {
-        "pip": [
-        ]
-    },
+    "dependencies": {},
     "version": "1.0.0",
     "author": "Cindy Xiao",
     "minimumbinaryninjaversion": 2846
