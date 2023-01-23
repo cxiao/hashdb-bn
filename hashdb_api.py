@@ -102,6 +102,9 @@ class HashString:
         else:
             return self.string
 
+    def __str__(self) -> str:
+        return f"{self.string}"
+
 
 @dataclass
 class Hash:
@@ -120,6 +123,9 @@ class Hash:
             hash_string=HashString.from_dict(src["string"]),
         )
         return result
+
+    def __str__(self) -> str:
+        return f"{self.hash_string}: {self.value:#x}"
 
 
 @dataclass

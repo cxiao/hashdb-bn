@@ -109,14 +109,17 @@ class HashLookupTask(BackgroundTaskThread):
         hash_string: api.HashString
 
         if hash_results is None or len(hash_results) == 0:
-            logger.log_warn(f"No hash found for value {self.hash_value:#x}")
-            self.progress = f"[HashDB] Hash lookup finished; no hash found for value {self.hash_value:#x}"
+            logger.log_warn(
+                f"Hash lookup finished; no hash found for value {self.hash_value:#x}"
+            )
             self.finish()
             return
         elif len(hash_results) == 1:
             hash_string = hash_results[0].hash_string
         else:
-            self.progress = f"[HashDB] Multiple hash results found; choose a hash..."
+            logger.log_info(
+                f"[HashDB] Multiple hash results found for hash value {self.hash_value:#x}: {hash_results}"
+            )
             output_user_choose_hash_from_collisions: List[Optional[api.HashString]] = [
                 None
             ]
@@ -137,7 +140,9 @@ class HashLookupTask(BackgroundTaskThread):
                 return
 
         if hash_string.is_api and hash_string.modules is not None:
-            self.progress = f"[HashDB] Hash found is an API string which is part of a module; choose whether to import the module..."
+            logger.log_info(
+                f"Hash with value {self.hash_value:#x} is an API string which is part of the modules {hash_string.modules}"
+            )
             output_user_choose_module_import: List[Optional[str]] = [None]
             user_choose_module_fn = partial(
                 self.user_choose_module_import,
@@ -149,9 +154,6 @@ class HashLookupTask(BackgroundTaskThread):
             module_to_import = output_user_choose_module_import[0]
             self.progress = ""
 
-            logger.log_debug(
-                f"user chose module with name {module_to_import} to import from list {hash_string.modules}"
-            )
             if module_to_import is not None and hash_string.permutation is not None:
                 module_hash_list = self.call_api_get_module_hashes(
                     self.hashdb_api_url,
@@ -159,23 +161,29 @@ class HashLookupTask(BackgroundTaskThread):
                     module_to_import,
                     hash_string.permutation,
                 )
-                logger.log_debug(
-                    f"hash_lookup obtained module hash list: {module_hash_list}"
-                )
+
                 if module_hash_list is not None:
+                    enum_name = construct_enum_name(
+                        self.hashdb_enum_name, self.hashdb_algorithm
+                    )
+                    logger.log_info(
+                        f"Adding all hashes from module with name {module_to_import} to enum '{enum_name}'"
+                    )
                     add_enums(
                         bv=self.bv,
-                        enum_name=construct_enum_name(
-                            self.hashdb_enum_name, self.hashdb_algorithm
-                        ),
+                        enum_name=enum_name,
                         enum_width=self.hashdb_algorithm_data_width,
                         hash_list=module_hash_list,
                     )
                     self.bv.update_analysis_and_wait()
 
+        enum_name = construct_enum_name(self.hashdb_enum_name, self.hashdb_algorithm)
+        logger.log_info(
+            f"Adding hash with value {self.hash_value:#x} and resolved string '{hash_string}' to enum '{enum_name}'"
+        )
         add_enums(
             bv=self.bv,
-            enum_name=construct_enum_name(self.hashdb_enum_name, self.hashdb_algorithm),
+            enum_name=enum_name,
             enum_width=self.hashdb_algorithm_data_width,
             hash_list=[api.Hash(self.hash_value, hash_string)],
         )
@@ -271,12 +279,12 @@ def hash_lookup(context: UIActionContext) -> None:
 
     hashdb_api_url = Settings().get_string("hashdb.url")
     if hashdb_api_url is None or hashdb_api_url == "":
-        logger.log_error("HashDB API URL not found.")
+        logger.log_error("HashDB API URL setting (`hashdb.url`) not found.")
         return
 
     hashdb_enum_name = Settings().get_string_with_scope("hashdb.enum_name", bv)[0]
     if hashdb_enum_name is None or hashdb_enum_name == "":
-        logger.log_error("HashDB enum name not found.")
+        logger.log_error("HashDB Enum Name setting (`hashdb.enum_name`) not found.")
         return
 
     hashdb_algorithm = Settings().get_string_with_scope("hashdb.algorithm", bv)[0]
@@ -303,7 +311,7 @@ def hash_lookup(context: UIActionContext) -> None:
         if token.type == InstructionTextTokenType.IntegerToken:
             if token.text.startswith("-"):
                 # Handle negatives later
-                logger.log_warn("plugin does not currently handle negative values.")
+                logger.log_warn("Plugin does not currently handle negative values.")
                 return
             hash_value = token.value
 
@@ -390,7 +398,7 @@ def select_hash_algorithm(context: UIActionContext) -> None:
 
     hashdb_api_url = Settings().get_string("hashdb.url")
     if hashdb_api_url is None or hashdb_api_url == "":
-        logger.log_error("HashDB API URL not found.")
+        logger.log_error("HashDB API URL setting (`hashdb.url`) not found.")
         return
 
     try:
@@ -442,7 +450,7 @@ class MultipleHashLookupTask(BackgroundTaskThread):
         hash_values: List[int],
     ):
         super().__init__(
-            initial_progress_text="[HashDB] Hash scan task starting...",
+            initial_progress_text="[HashDB] Multiple hash lookup task starting...",
             can_cancel=False,
         )
 
@@ -469,11 +477,15 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                     self.finish()
                     return
                 if len(collected_hash_value) == 1:
+                    enum_name = construct_enum_name(
+                        self.hashdb_enum_name, self.hashdb_algorithm
+                    )
+                    logger.log_info(
+                        f"Adding hash {collected_hash_value[0]} to enum '{enum_name}'"
+                    )
                     add_enums(
                         bv=self.bv,
-                        enum_name=construct_enum_name(
-                            self.hashdb_enum_name, self.hashdb_algorithm
-                        ),
+                        enum_name=enum_name,
                         enum_width=self.hashdb_algorithm_data_width,
                         hash_list=collected_hash_value,
                     )
@@ -491,11 +503,15 @@ class MultipleHashLookupTask(BackgroundTaskThread):
                     hash_string = output_user_choose_hash_from_collisions[0]
 
                     if hash_string is not None:
+                        enum_name = construct_enum_name(
+                            self.hashdb_enum_name, self.hashdb_algorithm
+                        )
+                        logger.log_info(
+                            f"Adding hash with value {collected_hash_value[0].value:#x} and resolved string '{hash_string}' to enum '{enum_name}'"
+                        )
                         add_enums(
                             bv=self.bv,
-                            enum_name=construct_enum_name(
-                                self.hashdb_enum_name, self.hashdb_algorithm
-                            ),
+                            enum_name=enum_name,
                             enum_width=self.hashdb_algorithm_data_width,
                             hash_list=[
                                 api.Hash(collected_hash_value[0].value, hash_string)
@@ -556,12 +572,12 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
 
     hashdb_api_url = Settings().get_string("hashdb.url")
     if hashdb_api_url is None or hashdb_api_url == "":
-        logger.log_error("HashDB API URL not found.")
+        logger.log_error("HashDB API URL setting (`hashdb.url`) not found.")
         return
 
     hashdb_enum_name = Settings().get_string_with_scope("hashdb.enum_name", bv)[0]
     if hashdb_enum_name is None or hashdb_enum_name == "":
-        logger.log_error("HashDB enum name not found.")
+        logger.log_error("HashDB Enum Name setting (`hashdb.enum_name`) not found.")
         return
 
     hashdb_algorithm = Settings().get_string_with_scope("hashdb.algorithm", bv)[0]
@@ -640,8 +656,12 @@ class HuntAlgorithmTask(BackgroundTaskThread):
     def run(self):
         match_results = self.call_hunt_api(self.hashdb_api_url, self.hash_value)
         if match_results is None or len(match_results) == 0:
+            logger.log_info(
+                f"No algorithms matched the hash with value {self.hash_value:#x}."
+            )
             interaction.show_message_box(
-                "[HashDB] No Match", "No algorithms matched the hash."
+                title="[HashDB] No Match",
+                text=f"No algorithms matched the hash with value {self.hash_value:#x}.",
             )
         else:
             # The hunt API endpoint doesn't actually return any algorithm descriptions
@@ -703,6 +723,10 @@ class HuntAlgorithmTask(BackgroundTaskThread):
         )
         if choice_idx is not None:
             (_hunt_match, chosen_algorithm) = match_results[choice_idx]
+            logger.log_info(
+                f"Setting the hash algorithm for this analysis database to '{chosen_algorithm}'"
+            )
+
             algorithm_name = chosen_algorithm.algorithm
             algorithm_data_type = chosen_algorithm.type.name
             Settings().set_string(
@@ -726,12 +750,12 @@ def hunt_algorithm(context: UIActionContext) -> None:
 
     hashdb_api_url = Settings().get_string("hashdb.url")
     if hashdb_api_url is None or hashdb_api_url == "":
-        logger.log_error("HashDB API URL not found.")
+        logger.log_error("HashDB API URL setting (`hashdb.url`) not found.")
         return
 
     hashdb_enum_name = Settings().get_string_with_scope("hashdb.enum_name", bv)[0]
     if hashdb_enum_name is None or hashdb_enum_name == "":
-        logger.log_error("HashDB enum name not found.")
+        logger.log_error("HashDB Enum Name setting (`hashdb.enum_name`) not found.")
         return
 
     if context.token.token:
@@ -739,7 +763,7 @@ def hunt_algorithm(context: UIActionContext) -> None:
         if token.type == InstructionTextTokenType.IntegerToken:
             if token.text.startswith("-"):
                 # Handle negatives later
-                logger.log_warn("plugin does not currently handle negative values.")
+                logger.log_warn("Plugin does not currently handle negative values.")
                 return
             hash_value = token.value
             HuntAlgorithmTask(bv, hashdb_api_url, hash_value).start()
