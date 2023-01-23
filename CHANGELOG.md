@@ -2,6 +2,7 @@
 
 ## 1.0.0 (2023-01-23)
 
+This is the initial release to the Binary Ninja plugin manager.
 
 ### Features
 
