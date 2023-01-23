@@ -72,7 +72,7 @@ The plugin currently does not ship with any keyboard shortcuts set by default.
 
 This plugin can be installed via either:
 
-1) (Available soon) Binary Ninja's built-in plugin manager (_Plugins > Manage Plugins_).
+1) Searching for the _HashDB_ plugin in Binary Ninja's built-in plugin manager (_Plugins > Manage Plugins_). _This is the recommended method._
 
 2) Cloning this repository into your user plugins folder.
     - The [location of the user plugins folder will vary depending on the platform Binary Ninja is installed on](https://docs.binary.ninja/guide/index.html#user-folder). The easiest way to find the location of the folder is via the _Plugins > Open Plugin Folder..._ command.
