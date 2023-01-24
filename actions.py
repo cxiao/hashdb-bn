@@ -637,7 +637,7 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
         ).start()
 
     except Exception as err:
-        logger.log_error("Error trying to read highlighted text: {err}")
+        logger.log_error(f"Error trying to read highlighted text: {err}")
 
 
 # --------------------------------------------------------------------------
