@@ -1,6 +1,6 @@
-from typing import cast, Dict, List, Optional, Union, Tuple
-from functools import partial
 import struct
+from functools import partial
+from typing import Dict, List, Optional, Tuple, Union, cast
 
 from binaryninja import BinaryReader, BinaryView, interaction
 from binaryninja.enums import Endianness, InstructionTextTokenType, TypeClass
@@ -11,8 +11,8 @@ from binaryninja.mainthread import (
 )
 from binaryninja.plugin import BackgroundTaskThread
 from binaryninja.settings import Settings, SettingsScope
-from binaryninja.types import EnumerationBuilder, Type, QualifiedName
-from binaryninjaui import UIActionContext  # type: ignore
+from binaryninja.types import EnumerationBuilder, QualifiedName, Type
+from binaryninjaui import UIActionContext  # type: ignore  # type: ignore
 
 from . import hashdb_api as api
 
