@@ -466,9 +466,9 @@ class MultipleHashLookupTask(BackgroundTaskThread):
 
         for collected_hash_value in collected_hash_values:
             if isinstance(collected_hash_value, api.HashDBError):
-                logger.log_error(f"HashDB API request failed: {collected_hash_value}")
-                self.finish()
-                return
+                logger.log_error(
+                    f"HashDB API request failed when looking up hash: {collected_hash_value}"
+                )
             elif isinstance(collected_hash_value, List):
                 if len(collected_hash_value) == 0:
                     self.finish()
