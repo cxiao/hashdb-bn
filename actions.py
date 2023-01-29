@@ -309,10 +309,7 @@ def hash_lookup(context: UIActionContext) -> None:
     if context.token.token:
         token = context.token.token
         if token.type == InstructionTextTokenType.IntegerToken:
-            if token.text.startswith("-"):
-                # Handle negatives later
-                logger.log_warn("Plugin does not currently handle negative values.")
-                return
+            logger.log_debug(f"Integer token found: {token.value:#x}")
             hash_value = token.value
 
             HashLookupTask(
@@ -761,10 +758,7 @@ def hunt_algorithm(context: UIActionContext) -> None:
     if context.token.token:
         token = context.token.token
         if token.type == InstructionTextTokenType.IntegerToken:
-            if token.text.startswith("-"):
-                # Handle negatives later
-                logger.log_warn("Plugin does not currently handle negative values.")
-                return
+            logger.log_debug(f"Integer token found: {token.value:#x}")
             hash_value = token.value
             HuntAlgorithmTask(bv, hashdb_api_url, hash_value).start()
         else:
