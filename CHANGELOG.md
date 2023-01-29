@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/cxiao/hashdb_bn/compare/v1.0.0...v1.1.0) (2023-01-29)
+
+
+### Features
+
+* Allow negative token values in Hash Lookup ([c4114de](https://github.com/cxiao/hashdb_bn/commit/c4114de9fe32b45558840f8cc3ee645a7e8cfa5d))
+* In Multiple Hash Lookup, still add successfully resolved hashes even if one request fails ([60a80ae](https://github.com/cxiao/hashdb_bn/commit/60a80aec0ccbbbfc81df3435a11aa6b257771cbc))
+
+
+### Bug Fixes
+
+* Fix error message formatting when selected text is invalid ([b63334f](https://github.com/cxiao/hashdb_bn/commit/b63334fde24e8474b6046620f72dc63a956e0824))
+
 ## 1.0.0 (2023-01-23)
 
 This is the initial release to the Binary Ninja plugin manager.
