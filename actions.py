@@ -15,6 +15,7 @@ from binaryninja.types import EnumerationBuilder, QualifiedName, Type
 from binaryninjaui import UIActionContext  # type: ignore  # type: ignore
 
 from . import hashdb_api as api
+from . import ui
 
 logger = Logger(session_id=0, logger_name=__name__)
 
@@ -411,11 +412,13 @@ def select_hash_algorithm(context: UIActionContext) -> None:
         prompt_text_current_algorithm = "None"
     prompt_text = f"Select an algorithm from the list of known algorithms below.\nIf you are not sure which algorithm is correct, you can try selecting a value and hunting for a matching algorithm via the HashDB > Hunt action instead.\n\nThe currently set algorithm is `{prompt_text_current_algorithm}`."
 
-    algorithm_choice = interaction.get_choice_input(
+    algorithm_choice = ui.get_algorithm_choice(
+        context=context,
         title="[HashDB] Algorithm Selection",
-        prompt=prompt_text,
-        choices=algorithms,
+        prompt_text=prompt_text,
+        algorithm_choices=algorithms,
     )
+
     if algorithm_choice is not None:
         algorithm_name = algorithms[algorithm_choice].algorithm
         algorithm_data_type = algorithms[algorithm_choice].type.name
