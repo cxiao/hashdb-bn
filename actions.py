@@ -764,7 +764,7 @@ def hunt_algorithm(context: UIActionContext) -> None:
         logger.log_error("HashDB Enum Name setting (`hashdb.enum_name`) not found.")
         return
 
-    if context.token.token:
+    if context.token.token is not None and context.token.token.text != "":
         token = context.token.token
         if token.type == InstructionTextTokenType.IntegerToken:
             logger.log_debug(f"Integer token found: {token.value:#x}")
