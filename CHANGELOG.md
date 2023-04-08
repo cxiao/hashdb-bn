@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/cxiao/hashdb_bn/compare/v1.1.0...v1.2.0) (2023-04-08)
+
+
+### Features
+
+* Use table for listing algorithms in Select Hash Algorithm command ([4f44cee](https://github.com/cxiao/hashdb_bn/commit/4f44ceeebf294ad4b9aa0f87a51cc4e2863cc602))
+* Use table for listing results for Hunt Algorithm command ([8f404fd](https://github.com/cxiao/hashdb_bn/commit/8f404fd9213b2a720c12dc2dc6f71293e7b30ac3))
+
+
+### Bug Fixes
+
+* Correctly choose selection instead of token logic in Hunt Algorithm task ([ff32c19](https://github.com/cxiao/hashdb_bn/commit/ff32c191852a382048116ae1c7bfef53e2573baf))
+
 ## [1.1.0](https://github.com/cxiao/hashdb_bn/compare/v1.0.0...v1.1.0) (2023-01-29)
 
 
