@@ -644,11 +644,18 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
 # Algorithm search function
 # --------------------------------------------------------------------------
 class HuntAlgorithmTask(BackgroundTaskThread):
-    def __init__(self, bv: BinaryView, hashdb_api_url: str, hash_value: int):
+    def __init__(
+        self,
+        context: UIActionContext,
+        bv: BinaryView,
+        hashdb_api_url: str,
+        hash_value: int,
+    ):
         super().__init__(
             initial_progress_text="[HashDB] Algorithm hunt task starting...",
             can_cancel=False,
         )
+        self.context = context
         self.bv = bv
         self.hashdb_api_url = hashdb_api_url
         self.hash_value = hash_value
@@ -713,13 +720,12 @@ class HuntAlgorithmTask(BackgroundTaskThread):
         self,
         match_results: List[Tuple[api.HuntMatch, api.Algorithm]],
     ) -> None:
-        displayed_match_results = [
-            f"Count {hunt_match.count}, Hit rate {hunt_match.hitrate:.1%}: {algorithm}"
-            for (hunt_match, algorithm) in match_results
-        ]
         msg = """The following algorithms contain a matching hash.\n\nSelect an algorithm to set as the default for this binary."""
-        choice_idx = interaction.get_choice_input(
-            msg, "[HashDB] Algorithm Selection", displayed_match_results
+        choice_idx = ui.get_hunt_algorithm_match_result_choice(
+            context=self.context,
+            title="[HashDB] Algorithm Selection",
+            prompt_text=msg,
+            match_results=match_results,
         )
         if choice_idx is not None:
             (_hunt_match, chosen_algorithm) = match_results[choice_idx]
@@ -763,7 +769,12 @@ def hunt_algorithm(context: UIActionContext) -> None:
         if token.type == InstructionTextTokenType.IntegerToken:
             logger.log_debug(f"Integer token found: {token.value:#x}")
             hash_value = token.value
-            HuntAlgorithmTask(bv, hashdb_api_url, hash_value).start()
+            HuntAlgorithmTask(
+                context=context,
+                bv=bv,
+                hashdb_api_url=hashdb_api_url,
+                hash_value=hash_value,
+            ).start()
         else:
             logger.log_error(
                 f"Could not look up hash: the selected token `{token.text}` does not look like a valid integer."
@@ -806,6 +817,7 @@ def hunt_algorithm(context: UIActionContext) -> None:
 
             if selected_integer_value is not None:
                 HuntAlgorithmTask(
+                    context=context,
                     bv=bv,
                     hashdb_api_url=hashdb_api_url,
                     hash_value=selected_integer_value,
