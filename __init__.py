@@ -67,6 +67,7 @@ logger = Logger(session_id=0, logger_name=__name__)
 
 DEFAULT_ENUM_NAME = "hashdb_strings"
 DEFAULT_API_URL = "https://hashdb.openanalysis.net"
+DEFAULT_XOR_KEY = ""
 HASHDB_PLUGIN_SETTINGS: List[Tuple[str, dict]] = [
     (
         "hashdb.url",
@@ -108,6 +109,16 @@ HASHDB_PLUGIN_SETTINGS: List[Tuple[str, dict]] = [
             "enumDescriptions": ["unsigned int (4 bytes)", "unsigned long (8 bytes)"],
             "description": "Data type and data size of the hash algorithm used for the current binary. This setting is specific to a particular analysis database.",
             "ignore": ["SettingsUserScope", "SettingsProjectScope"],
+        },
+    ),
+    (
+        "hashdb.xor_key",
+        {
+            "title": "HashDB Hash Algorithm Optional XOR key",
+            "type": "string",
+            "default": DEFAULT_XOR_KEY,
+            "description": "Optional XOR key to use with each hash value (common technique used by malware authors)",
+            "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
         },
     ),
 ]
