@@ -648,7 +648,7 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
 
         hashdb_xor_key = Settings().get_string_with_scope("hashdb.xor_key", bv)[0]
 
-        if hashdb_xor_key is not None or hashdb_xor_key != "":
+        if hashdb_xor_key is not None and hashdb_xor_key != "":
                 hashdb_xor_key = int(hashdb_xor_key, 16)
                 for i in range(0, len(selected_integer_values)):
                     logger.log_debug(f"XORing value {selected_integer_values[i]:#x} with {hashdb_xor_key:#x}")
