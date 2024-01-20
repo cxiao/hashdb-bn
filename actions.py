@@ -24,10 +24,10 @@ def add_enums(
     bv: BinaryView, enum_name: str, enum_width: int, hash_list: List[api.Hash]
 ) -> None:
     hashdb_xor_key = Settings().get_string_with_scope("hashdb.xor_key", bv)[0]
-    if hashdb_xor_key is not None or hashdb_xor_key != "":
+    if hashdb_xor_key is not None and hashdb_xor_key != "":
         hashdb_xor_key = int(hashdb_xor_key, 16)
-    for i in range(0, len(hash_list)):
-        hash_list[i].value = hash_list[i].value ^ hashdb_xor_key
+        for i in range(0, len(hash_list)):
+            hash_list[i].value = hash_list[i].value ^ hashdb_xor_key
     existing_type = bv.types.get(enum_name)
     if existing_type is None:
         # Create a new enum
