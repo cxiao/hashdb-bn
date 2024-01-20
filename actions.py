@@ -320,7 +320,7 @@ def hash_lookup(context: UIActionContext) -> None:
             logger.log_debug(f"Integer token found: {token.value:#x}")
             hash_value = token.value
 
-            if hashdb_xor_key is not None or hashdb_xor_key != "":
+            if hashdb_xor_key is not None and hashdb_xor_key != "":
                 hashdb_xor_key = int(hashdb_xor_key, 16)
                 logger.log_debug(f"XORing value {hash_value:#x} with {hashdb_xor_key:#x}")
                 hash_value = hash_value ^ hashdb_xor_key
