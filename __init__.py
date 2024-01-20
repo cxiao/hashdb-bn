@@ -117,8 +117,8 @@ HASHDB_PLUGIN_SETTINGS: List[Tuple[str, dict]] = [
             "title": "HashDB Hash Algorithm Optional XOR key",
             "type": "string",
             "default": DEFAULT_XOR_KEY,
-            "description": "Optional XOR key to use with each hash value (common technique used by malware authors)",
-            "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
+            "description": "Optional XOR key to use with each hash value (common technique used by malware authors). This should be a hexadecimal value, e.g. 0x1234ABEF. This setting is specific to a particular analysis database.",
+            "ignore": ["SettingsUserScope", "SettingsProjectScope"],
         },
     ),
 ]
