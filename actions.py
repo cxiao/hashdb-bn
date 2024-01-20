@@ -485,7 +485,6 @@ class MultipleHashLookupTask(BackgroundTaskThread):
             self.hashdb_algorithm, self.hash_values, self.hashdb_api_url
         )
 
-        hashdb_xor_key = Settings().get_string_with_scope("hashdb.xor_key", self.bv)[0]
 
         for collected_hash_value in collected_hash_values:
             if isinstance(collected_hash_value, api.HashDBError):
