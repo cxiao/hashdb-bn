@@ -43,6 +43,7 @@
 import json
 from typing import List, Tuple
 
+import binaryninja
 from binaryninja import core_version
 from binaryninja.log import Logger
 from binaryninja.settings import Settings
@@ -132,9 +133,15 @@ def register_settings() -> bool:
 # --------------------------------------------------------------------------
 def plugin_parent_menu() -> str:
     parent_menu = "Tools"
-    version = core_version()
-    if version and int(version[4:][:4]) >= 3505:
-        parent_menu = "Plugins"
+    try:
+        # core_version_info is added in dev 3.1.3545
+        version = binaryninja.core_version_info()
+        if version.build >= 3505:
+            parent_menu = "Plugins"
+    except:
+        version = core_version()
+        if version and int(version[4:][:4]) >= 3505:
+            parent_menu = "Plugins"
     return parent_menu
 
 
