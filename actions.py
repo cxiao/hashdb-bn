@@ -309,7 +309,7 @@ def hash_lookup(context: UIActionContext) -> None:
 
     if context.token.token:
         token = context.token.token
-        if token.type == InstructionTextTokenType.IntegerToken:
+        if token.type in [InstructionTextTokenType.IntegerToken, InstructionTextTokenType.PossibleAddressToken]:
             logger.log_debug(f"Integer token found: {token.value:#x}")
             hash_value = token.value
 
