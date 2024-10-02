@@ -43,7 +43,6 @@
 import json
 from typing import List, Tuple
 
-from binaryninja import core_version
 from binaryninja.log import Logger
 from binaryninja.settings import Settings
 from binaryninjaui import Menu, UIAction, UIActionHandler  # type: ignore
@@ -132,8 +131,17 @@ def register_settings() -> bool:
 # --------------------------------------------------------------------------
 def plugin_parent_menu() -> str:
     parent_menu = "Tools"
-    version = core_version()
-    if version and int(version[4:][:4]) >= 3505:
+    version = 0
+    try:
+        from binaryninja import core_version_info
+        version = core_version_info().build
+    except:
+        # can be removed whenever min build of the plugin is >= 3814
+        from binaryninja import core_version
+        version = core_version()
+        if version:
+            version = int(version[4:][:4])
+    if version >= 3505 or version == 0: #internal dev builds show 0
         parent_menu = "Plugins"
     return parent_menu
 
