@@ -423,16 +423,16 @@ def select_hash_algorithm(context: UIActionContext) -> None:
         algorithm_name = algorithms[algorithm_choice].algorithm
         algorithm_data_type = algorithms[algorithm_choice].type.name
         Settings().set_string(
-            key="hashdb.algorithm",
-            value=algorithm_name,
-            view=bv,
-            scope=SettingsScope.SettingsResourceScope,
+            "hashdb.algorithm",
+            algorithm_name,
+            bv,
+            SettingsScope.SettingsResourceScope,
         )
         Settings().set_string(
-            key="hashdb.algorithm_type",
-            value=algorithm_data_type,
-            view=bv,
-            scope=SettingsScope.SettingsResourceScope,
+            "hashdb.algorithm_type",
+            algorithm_data_type,
+            bv,
+            SettingsScope.SettingsResourceScope,
         )
 
 
@@ -736,16 +736,16 @@ class HuntAlgorithmTask(BackgroundTaskThread):
             algorithm_name = chosen_algorithm.algorithm
             algorithm_data_type = chosen_algorithm.type.name
             Settings().set_string(
-                key="hashdb.algorithm",
-                value=algorithm_name,
-                view=self.bv,
-                scope=SettingsScope.SettingsResourceScope,
+                "hashdb.algorithm",
+                algorithm_name,
+                self.bv,
+                SettingsScope.SettingsResourceScope,
             )
             Settings().set_string(
-                key="hashdb.algorithm_type",
-                value=algorithm_data_type,
-                view=self.bv,
-                scope=SettingsScope.SettingsResourceScope,
+                "hashdb.algorithm_type",
+                algorithm_data_type,
+                self.bv,
+                SettingsScope.SettingsResourceScope,
             )
         else:
             logger.log_warn("No hash algorithm selected.")
