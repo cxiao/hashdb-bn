@@ -135,12 +135,12 @@ def plugin_parent_menu() -> str:
     try:
         from binaryninja import core_version_info
         version = core_version_info().build
-    except:
+    except: # noqa: E722
         # can be removed whenever min build of the plugin is >= 3814
         from binaryninja import core_version
         version = core_version()
         if version:
-            version = int(version[4:][:4])
+            version = int(version[4:][:4]) # type: ignore
     if version >= 3505 or version == 0: #internal dev builds show 0
         parent_menu = "Plugins"
     return parent_menu

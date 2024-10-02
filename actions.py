@@ -2,7 +2,8 @@ import struct
 from functools import partial
 from typing import Dict, List, Optional, Tuple, Union, cast
 
-from binaryninja import BinaryReader, BinaryView, interaction
+from binaryninja import interaction
+from binaryninja.binaryview import BinaryReader, BinaryView
 from binaryninja.enums import Endianness, InstructionTextTokenType, TypeClass
 from binaryninja.log import Logger
 from binaryninja.mainthread import (
