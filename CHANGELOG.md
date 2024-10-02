@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/cxiao/hashdb_bn/compare/v1.2.0...v1.2.1) (2024-10-02)
+
+
+### Bug Fixes
+
+* Use positional arguments for calls to Settings.set_string for changes in 4.2.x-dev API ([6bdff21](https://github.com/cxiao/hashdb_bn/commit/6bdff21fd3460baa66a577600b6e780e96f4e10d))
+
 ## [1.2.0](https://github.com/cxiao/hashdb_bn/compare/v1.1.0...v1.2.0) (2023-04-08)
 
 
