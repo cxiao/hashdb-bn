@@ -24,6 +24,11 @@ logger = Logger(session_id=0, logger_name=__name__)
 def add_enums(
     bv: BinaryView, enum_name: str, enum_width: int, hash_list: List[api.Hash]
 ) -> None:
+    hashdb_xor_key = Settings().get_string_with_scope("hashdb.xor_key", bv)[0]
+    if hashdb_xor_key is not None and hashdb_xor_key != "":
+        hashdb_xor_key = int(hashdb_xor_key, 16)
+        for i in range(0, len(hash_list)):
+            hash_list[i].value = hash_list[i].value ^ hashdb_xor_key
     existing_type = bv.types.get(enum_name)
     if existing_type is None:
         # Create a new enum
@@ -308,11 +313,18 @@ def hash_lookup(context: UIActionContext) -> None:
         hashdb_algorithm_data_type
     )
 
+    hashdb_xor_key = Settings().get_string_with_scope("hashdb.xor_key", bv)[0]
+
     if context.token.token:
         token = context.token.token
         if token.type == InstructionTextTokenType.IntegerToken:
             logger.log_debug(f"Integer token found: {token.value:#x}")
             hash_value = token.value
+
+            if hashdb_xor_key is not None and hashdb_xor_key != "":
+                hashdb_xor_key = int(hashdb_xor_key, 16)
+                logger.log_debug(f"XORing value {hash_value:#x} with {hashdb_xor_key:#x}")
+                hash_value = hash_value ^ hashdb_xor_key
 
             HashLookupTask(
                 bv=bv,
@@ -379,6 +391,12 @@ def hash_lookup(context: UIActionContext) -> None:
 
         if selected_integer_value is not None:
             logger.log_debug(f"Found value {selected_integer_value:#x}")
+
+            if hashdb_xor_key is not None and hashdb_xor_key != "":
+                hashdb_xor_key = int(hashdb_xor_key, 16)
+                logger.log_debug(f"XORing value {selected_integer_value:#x} with {hashdb_xor_key:#x}")
+                selected_integer_value = selected_integer_value ^ hashdb_xor_key
+
             HashLookupTask(
                 bv=bv,
                 hashdb_api_url=hashdb_api_url,
@@ -467,6 +485,7 @@ class MultipleHashLookupTask(BackgroundTaskThread):
         collected_hash_values = api.get_strings_from_hashes(
             self.hashdb_algorithm, self.hash_values, self.hashdb_api_url
         )
+
 
         for collected_hash_value in collected_hash_values:
             if isinstance(collected_hash_value, api.HashDBError):
@@ -628,6 +647,14 @@ def multiple_hash_lookup(context: UIActionContext) -> None:
         for selected_integer_value in selected_integer_values:
             logger.log_debug(f"Found value {selected_integer_value:#x}")
 
+        hashdb_xor_key = Settings().get_string_with_scope("hashdb.xor_key", bv)[0]
+
+        if hashdb_xor_key is not None and hashdb_xor_key != "":
+                hashdb_xor_key = int(hashdb_xor_key, 16)
+                for i in range(0, len(selected_integer_values)):
+                    logger.log_debug(f"XORing value {selected_integer_values[i]:#x} with {hashdb_xor_key:#x}")
+                    selected_integer_values[i] = selected_integer_values[i] ^ hashdb_xor_key        
+
         MultipleHashLookupTask(
             bv=bv,
             hashdb_api_url=hashdb_api_url,
@@ -659,7 +686,13 @@ class HuntAlgorithmTask(BackgroundTaskThread):
         self.context = context
         self.bv = bv
         self.hashdb_api_url = hashdb_api_url
-        self.hash_value = hash_value
+
+        hashdb_xor_key = Settings().get_string_with_scope("hashdb.xor_key", bv)[0]
+
+        if hashdb_xor_key is None or hashdb_xor_key == "":
+            self.hash_value = hash_value
+        else:
+            self.hash_value = hash_value ^ int(hashdb_xor_key, 16)
 
     def run(self):
         match_results = self.call_hunt_api(self.hashdb_api_url, self.hash_value)
