@@ -317,7 +317,7 @@ def hash_lookup(context: UIActionContext) -> None:
 
     if context.token.token:
         token = context.token.token
-        if token.type == InstructionTextTokenType.IntegerToken:
+        if token.type in [InstructionTextTokenType.IntegerToken, InstructionTextTokenType.PossibleAddressToken]:
             logger.log_debug(f"Integer token found: {token.value:#x}")
             hash_value = token.value
 
@@ -800,7 +800,8 @@ def hunt_algorithm(context: UIActionContext) -> None:
 
     if context.token.token is not None and context.token.token.text != "":
         token = context.token.token
-        if token.type == InstructionTextTokenType.IntegerToken:
+        logger.log_debug(token)
+        if token.type in [InstructionTextTokenType.IntegerToken, InstructionTextTokenType.PossibleAddressToken]:
             logger.log_debug(f"Integer token found: {token.value:#x}")
             hash_value = token.value
             HuntAlgorithmTask(
