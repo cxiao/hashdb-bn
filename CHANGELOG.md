@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/cxiao/hashdb_bn/compare/v1.2.1...v1.3.0) (2024-11-01)
+
+
+### Features
+
+* Added an option to specify optional XOR key to use with each hash value ([#16](https://github.com/cxiao/hashdb_bn/issues/16)) ([9668d3e](https://github.com/cxiao/hashdb_bn/commit/9668d3ee3fb07b002c29fac30be0b8067212bb35))
+* Allow hash lookups for tokens in disassembly view ([eb0ab05](https://github.com/cxiao/hashdb_bn/commit/eb0ab0585135a6812cce7d793d54fdf05f19dd49))
+
 ## [1.2.1](https://github.com/cxiao/hashdb_bn/compare/v1.2.0...v1.2.1) (2024-10-02)
 
 
